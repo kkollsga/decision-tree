@@ -1,0 +1,2910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decision Tree</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --bg-card: rgba(30, 30, 50, 0.98);
+            --bg-hover: rgba(79, 70, 229, 0.2);
+            --text-primary: #e0e0e0;
+            --text-secondary: #9ca3af;
+            --text-accent: #a5b4fc;
+            --border-color: rgba(255,255,255,0.1);
+        }
+
+        body.light-mode {
+            --bg-primary: linear-gradient(135deg, #f5f5f7 0%, #e8e8ec 100%);
+            --bg-card: rgba(255, 255, 255, 0.98);
+            --bg-hover: rgba(79, 70, 229, 0.1);
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --text-accent: #4f46e5;
+            --border-color: rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            min-height: 100vh;
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .header-title {
+            pointer-events: all;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 1.4rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.9);
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        body.light-mode .header h1 {
+            color: var(--text-primary);
+        }
+
+        .header h1:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        body.light-mode .header h1:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .project-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 8px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            border: 1px solid var(--border-color);
+            min-width: 280px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+            z-index: 2000;
+        }
+
+        .project-dropdown.visible {
+            display: block;
+        }
+
+        .project-dropdown-header {
+            padding: 10px 14px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .project-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: background 0.1s;
+            gap: 10px;
+        }
+
+        .project-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .project-item.active {
+            background: rgba(79, 70, 229, 0.3);
+        }
+
+        body.light-mode .project-item.active {
+            background: rgba(79, 70, 229, 0.15);
+        }
+
+        .project-item-name {
+            flex: 1;
+            font-size: 0.85rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .project-item-input {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #4f46e5;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 0.85rem;
+        }
+
+        .project-item-btn {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        body.light-mode .project-item-btn {
+            color: #6b7280;
+        }
+
+        .project-item-btn:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+
+        body.light-mode .project-item-btn:hover {
+            color: #1f2937;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .project-item-btn.danger:hover {
+            color: #ef4444;
+            background: rgba(239,68,68,0.1);
+        }
+
+        .project-item-btn.confirm:hover {
+            color: #34d399;
+            background: rgba(52,211,153,0.1);
+        }
+
+        .project-new {
+            padding: 10px 14px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #a5b4fc;
+            font-size: 0.85rem;
+        }
+
+        .project-new:hover {
+            background: rgba(79, 70, 229, 0.2);
+        }
+
+        .project-footer {
+            padding: 10px 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .project-footer-btn {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+        }
+
+        .project-footer-btn:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+
+        body.light-mode .project-footer-btn {
+            color: #6b7280;
+        }
+
+        body.light-mode .project-footer-btn:hover {
+            color: #1f2937;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .delete-confirm {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.3);
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin: 8px 14px;
+            display: none;
+        }
+
+        body.light-mode .delete-confirm {
+            background: rgba(239,68,68,0.08);
+            border: 1px solid rgba(239,68,68,0.2);
+        }
+
+        .delete-confirm.visible {
+            display: block;
+        }
+
+        .delete-confirm-text {
+            font-size: 0.8rem;
+            color: #fca5a5;
+            margin-bottom: 8px;
+        }
+
+        body.light-mode .delete-confirm-text {
+            color: #dc2626;
+        }
+
+        .delete-confirm-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .delete-confirm-btns button {
+            padding: 5px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .delete-confirm-btns .yes {
+            background: #ef4444;
+            color: white;
+        }
+
+        .delete-confirm-btns .no {
+            background: rgba(255,255,255,0.1);
+            color: #e0e0e0;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+
+        .canvas-container {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .tree-viewport {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+        }
+
+        .tree-viewport.dragging {
+            cursor: grabbing;
+        }
+
+        .tree-canvas {
+            position: absolute;
+            transform-origin: 0 0;
+            transition: transform 0.3s ease;
+        }
+
+        svg.connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .node-marker {
+            position: absolute;
+            cursor: pointer;
+            transition: transform 0.2s, filter 0.2s, box-shadow 0.2s;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .node-marker:hover {
+            transform: scale(1.15);
+            filter: brightness(1.2);
+        }
+
+        .node-marker.selected {
+            box-shadow: 0 0 0 10px rgba(255,255,255,0.15), 0 0 0 14px rgba(255,255,255,0.08);
+        }
+
+        .node-marker.copy-target {
+            box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.4), 0 0 0 14px rgba(59, 130, 246, 0.2);
+        }
+
+        body.light-mode .node-marker.copy-target {
+            box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.3), 0 0 0 14px rgba(59, 130, 246, 0.15);
+        }
+
+        .node-marker.copy-source {
+            box-shadow: 0 0 0 10px rgba(239, 68, 68, 0.4), 0 0 0 14px rgba(239, 68, 68, 0.2);
+        }
+
+        body.light-mode .node-marker.copy-source {
+            box-shadow: 0 0 0 10px rgba(239, 68, 68, 0.3), 0 0 0 14px rgba(239, 68, 68, 0.15);
+        }
+
+        .node-marker svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        .node-info {
+            position: absolute;
+            z-index: 6;
+            pointer-events: none;
+        }
+
+        .node-info-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+            white-space: nowrap;
+        }
+
+        .node-info-value {
+            font-size: 0.75rem;
+            color: #a5b4fc;
+            white-space: nowrap;
+        }
+
+        body.light-mode .node-info-name {
+            color: var(--text-primary);
+        }
+
+        body.light-mode .node-info-value {
+            color: #4f46e5;
+        }
+
+        .end-node-info {
+            position: absolute;
+            z-index: 6;
+            pointer-events: none;
+        }
+
+        .end-node-prob {
+            font-size: 0.75rem;
+            color: #f59e0b;
+            white-space: nowrap;
+        }
+
+        body.light-mode .end-node-prob {
+            color: #d97706;
+        }
+
+        .end-node-value {
+            font-size: 0.75rem;
+            color: #10b981;
+            white-space: nowrap;
+        }
+
+        body.light-mode .end-node-value {
+            color: #059669;
+        }
+
+        .branch-name {
+            position: absolute;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.85);
+            white-space: nowrap;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+            z-index: 6;
+            transition: background 0.2s;
+        }
+
+        .branch-name:hover {
+            background: rgba(79, 70, 229, 0.3);
+        }
+
+        body.light-mode .branch-name {
+            color: var(--text-primary);
+        }
+
+        body.light-mode .branch-name:hover {
+            background: rgba(79, 70, 229, 0.15);
+        }
+
+        .branch-prob {
+            position: absolute;
+            font-size: 0.65rem;
+            color: #f59e0b;
+            white-space: nowrap;
+            z-index: 6;
+        }
+
+        body.light-mode .branch-prob {
+            color: #d97706;
+        }
+
+        .branch-val {
+            position: absolute;
+            font-size: 0.65rem;
+            color: #10b981;
+            white-space: nowrap;
+            z-index: 6;
+        }
+
+        body.light-mode .branch-val {
+            color: #059669;
+        }
+
+        .add-node-hint {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(79, 70, 229, 0.3);
+            border: 2px dashed rgba(79, 70, 229, 0.7);
+            border-radius: 50%;
+            color: #a5b4fc;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        body.light-mode .add-node-hint {
+            background: rgba(79, 70, 229, 0.15);
+            border: 2px dashed rgba(79, 70, 229, 0.5);
+            color: #4f46e5;
+        }
+
+        .add-node-hint:hover {
+            background: rgba(79, 70, 229, 0.5);
+            border-color: #4f46e5;
+            color: #fff;
+            transform: scale(1.1);
+        }
+
+        body.light-mode .add-node-hint:hover {
+            background: rgba(79, 70, 229, 0.3);
+            color: #fff;
+        }
+
+        /* Card Layout */
+        .edit-panel {
+            position: fixed;
+            right: 20px;
+            bottom: 70px;
+            display: none;
+            gap: 12px;
+            z-index: 1000;
+        }
+
+        .edit-panel.visible {
+            display: flex;
+            animation: slideUp 0.2s ease;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        body.light-mode .card-header {
+            background: rgba(0,0,0,0.05);
+        }
+
+        .card-body {
+            padding: 16px;
+            flex: 1;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .card-footer {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        body.light-mode .card-footer {
+            background: rgba(0,0,0,0.05);
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            -moz-appearance: textfield;
+        }
+
+        body.light-mode .form-group input,
+        body.light-mode .form-group select {
+            background: rgba(0,0,0,0.05);
+            color: var(--text-primary);
+        }
+
+        .form-group input::-webkit-outer-spin-button,
+        .form-group input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .form-group select {
+            color: #000;
+            background: #fff;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            background: rgba(79, 70, 229, 0.2);
+        }
+
+        .form-group input.error {
+            border-color: #ef4444;
+            background: rgba(239,68,68,0.1);
+        }
+
+        .error-message {
+            color: #fca5a5;
+            font-size: 0.7rem;
+            margin-top: 4px;
+        }
+
+        body.light-mode .error-message {
+            color: #dc2626;
+        }
+
+        .stats-section {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            margin-bottom: 6px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+        }
+
+        .stat-value {
+            color: #a5b4fc;
+            font-weight: 600;
+        }
+
+        body.light-mode .stat-value {
+            color: #4f46e5;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-confirm {
+            background: #4f46e5;
+            color: white;
+        }
+
+        .btn-confirm:hover {
+            background: #4338ca;
+        }
+
+        .btn-confirm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-confirm:disabled:hover {
+            background: #4f46e5;
+        }
+
+        .btn-cancel {
+            background: rgba(255,255,255,0.1);
+            color: #e0e0e0;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        body.light-mode .btn-cancel {
+            background: rgba(0,0,0,0.1);
+            color: var(--text-primary);
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+
+        .btn-cancel:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        body.light-mode .btn-cancel:hover {
+            background: rgba(0,0,0,0.2);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            border: 1px solid rgba(239,68,68,0.5);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        body.light-mode .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(239,68,68,0.4);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fff;
+        }
+
+        body.light-mode .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #991b1b;
+        }
+
+        .btn-copy {
+            background: rgba(59, 130, 246, 0.25);
+            color: #bfdbfe;
+            border: 1px solid rgba(59, 130, 246, 0.6);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        body.light-mode .btn-copy {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-copy:hover {
+            background: rgba(59, 130, 246, 0.35);
+            color: #fff;
+        }
+
+        body.light-mode .btn-copy:hover {
+            background: rgba(59, 130, 246, 0.25);
+            color: #1d4ed8;
+        }
+
+        .btn-add {
+            background: rgba(79, 70, 229, 0.2);
+            color: #a5b4fc;
+            border: 1px dashed rgba(79, 70, 229, 0.5);
+            padding: 6px 12px;
+            font-size: 0.75rem;
+        }
+
+        .btn-add:hover {
+            background: rgba(79, 70, 229, 0.3);
+            color: #fff;
+        }
+
+        /* Branch Table */
+        .branch-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .branch-table th {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 6px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .branch-table td {
+            padding: 4px 4px;
+        }
+
+        .branch-table input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            background: rgba(255,255,255,0.08);
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            -moz-appearance: textfield;
+        }
+
+        body.light-mode .branch-table input {
+            background: rgba(0,0,0,0.05);
+            color: var(--text-primary);
+            border: 1px solid rgba(0,0,0,0.15);
+        }
+
+        .branch-table input::-webkit-outer-spin-button,
+        .branch-table input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .branch-table input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            background: rgba(79, 70, 229, 0.2);
+        }
+
+        .branch-table input.error {
+            border-color: #ef4444;
+            background: rgba(239,68,68,0.1);
+        }
+
+        .branch-table input.name-input {
+            min-width: 80px;
+        }
+
+        .branch-table input.number-input {
+            width: 60px;
+            text-align: right;
+        }
+
+        .branch-table .delete-btn {
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 4px;
+            opacity: 0.5;
+            transition: all 0.2s;
+        }
+
+        .branch-table .delete-btn:hover {
+            color: #ef4444;
+            opacity: 1;
+        }
+
+        .branch-sum {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.75rem;
+        }
+
+        .branch-sum-label {
+            color: #9ca3af;
+        }
+
+        .branch-sum-value {
+            font-weight: 600;
+        }
+
+        .branch-sum-value.valid {
+            color: #10b981;
+        }
+
+        body.light-mode .branch-sum-value.valid {
+            color: #059669;
+        }
+
+        .branch-sum-value.invalid {
+            color: #f59e0b;
+        }
+
+        body.light-mode .branch-sum-value.invalid {
+            color: #d97706;
+        }
+
+        /* Copy to node card */
+        .copy-card {
+            min-width: 220px;
+        }
+
+        .copy-card select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: #fff;
+            color: #000;
+            font-size: 0.85rem;
+        }
+
+        body.light-mode .copy-card select {
+            background: #f3f4f6;
+            color: #1f2937;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .context-menu {
+            position: fixed;
+            background: var(--bg-card);
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            z-index: 2000;
+            min-width: 120px;
+            max-width: 350px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            border: 1px solid var(--border-color);
+            overflow-x: hidden;
+        }
+
+        .context-menu.visible {
+            display: block;
+        }
+
+        .context-menu-item {
+            padding: 9px 14px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.1s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+        }
+
+        .context-menu-item:hover {
+            background: rgba(79, 70, 229, 0.3);
+        }
+
+        body.light-mode .context-menu-item:hover {
+            background: rgba(79, 70, 229, 0.15);
+        }
+
+        .context-menu-item.danger {
+            color: #ef4444;
+        }
+
+        .context-menu-item.danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        body.light-mode .context-menu-item.danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        .legend {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(20, 20, 40, 0.9);
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            z-index: 100;
+        }
+
+        body.light-mode .legend {
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .legend-title {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .legend-items {
+            display: flex;
+            gap: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.7rem;
+            color: var(--text-primary);
+        }
+
+        .legend-shape {
+            width: 14px;
+            height: 14px;
+        }
+
+        .legend-shape svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .zoom-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 4px;
+            z-index: 100;
+        }
+
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            background: rgba(30, 30, 50, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body.light-mode .zoom-btn {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .zoom-btn:hover {
+            background: rgba(79, 70, 229, 0.3);
+        }
+
+        body.light-mode .zoom-btn:hover {
+            background: rgba(79, 70, 229, 0.15);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-title">
+            <h1 id="appTitle" onclick="toggleProjectDropdown(event)">My Decision Tree</h1>
+            <div class="project-dropdown" id="projectDropdown">
+                <div class="project-dropdown-header">Projects</div>
+                <div id="projectList"></div>
+                <div class="project-new" onclick="createNewProject()">
+                    <span>+</span> New Project
+                </div>
+                <div class="project-footer">
+                    <button class="project-footer-btn" onclick="importTree()" title="Import">📥</button>
+                    <button class="project-footer-btn" onclick="exportTree()" title="Export">📤</button>
+                    <button class="project-footer-btn" onclick="toggleDarkMode()" id="darkModeToggle" title="Toggle Dark Mode">🌙</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <div class="tree-viewport" id="treeViewport">
+            <div class="tree-canvas" id="treeCanvas">
+                <svg class="connections" id="connectionsSvg"></svg>
+            </div>
+        </div>
+    </div>
+
+    <div class="legend" id="legend"></div>
+
+    <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoomIn()">+</button>
+        <button class="zoom-btn" onclick="zoomOut()">−</button>
+        <button class="zoom-btn" onclick="fitToView()">⊡</button>
+    </div>
+
+    <div class="edit-panel" id="editPanel">
+        <div class="card copy-card" id="copyCard" style="display:none;">
+            <div class="card-header">Copy To Node</div>
+            <div class="card-body" id="copyCardBody"></div>
+            <div class="card-footer">
+                <button class="btn btn-cancel" onclick="hideCopyCard()">Cancel</button>
+                <button class="btn btn-confirm" onclick="executeCopy()">Copy</button>
+            </div>
+        </div>
+        <div class="card" id="nodeCard">
+            <div class="card-header" id="nodeCardHeader">Node Settings</div>
+            <div class="card-body" id="nodeCardBody"></div>
+            <div class="card-footer" id="nodeCardFooter">
+                <button class="btn btn-cancel" onclick="cancelEdit()">Cancel</button>
+                <button class="btn btn-confirm" onclick="applyChanges()">Confirm</button>
+            </div>
+        </div>
+        <div class="card" id="branchCard" style="display:none;">
+            <div class="card-header">Branch Settings</div>
+            <div class="card-body" id="branchCardBody"></div>
+            <div class="card-footer">
+                <button class="btn btn-add" onclick="addBranchToSelected()">+ Add Branch</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="context-menu" id="contextMenu"></div>
+
+    <input type="file" id="importInput" accept=".json" onchange="handleImport(event)">
+
+    <script>
+        const STORAGE_KEY = 'decisionTreeProjects';
+
+        let projects = {};
+        let currentProjectName = null;
+        
+        let treeData = {
+            name: "My Decision Tree",
+            unit: "$",
+            nodes: {},
+            rootId: null,
+            rootBranch: { name: "My Decision Tree", value: 0 }
+        };
+
+        let selectedNode = null;
+        let selectedRootBranch = false;
+        let currentZoom = 1;
+        let currentPan = { x: 0, y: 0 };
+        let branchCache = {};
+        let branchPropsCache = {}; // Cache probability/logic when switching types (for recovery)
+        let originalBranchProps = null; // Original values when panel opened (for cancel)
+        let originalNodeState = null;
+        let copyMode = false;
+        let copySourceNode = null;
+        let copyTargetNode = null;
+        let validCopyTargets = new Set();
+        let editingProjectName = null;
+        let deleteConfirmProject = null;
+
+        const MARKER_SIZE = 28;
+        const SIBLING_GAP = 80;
+        const ROOT_X = 80;
+        const BRANCH_LENGTH = 220;
+        const HORIZONTAL_LENGTH = 140;
+
+        function getShapes() {
+            const stroke = document.body.classList.contains('light-mode') ? '#374151' : '#fff';
+            return {
+                chance: () => `<svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="url(#grad-chance)" stroke="${stroke}" stroke-width="2"/></svg>`,
+                decision: () => `<svg viewBox="0 0 28 28"><polygon points="14,2 26,14 14,26 2,14" fill="url(#grad-decision)" stroke="${stroke}" stroke-width="2"/></svg>`,
+                logic: () => `<svg viewBox="0 0 28 28"><rect x="4" y="4" width="20" height="20" rx="3" fill="url(#grad-logic)" stroke="${stroke}" stroke-width="2"/></svg>`,
+                end: () => `<svg viewBox="0 0 28 28"><polygon points="2,14 24,3 24,25" fill="url(#grad-end)" stroke="${stroke}" stroke-width="2"/></svg>`
+            };
+        }
+
+        let shapes = getShapes();
+
+        const gradients = `
+            <defs>
+                <linearGradient id="grad-chance" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#f59e0b"/>
+                    <stop offset="100%" style="stop-color:#d97706"/>
+                </linearGradient>
+                <linearGradient id="grad-decision" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#3b82f6"/>
+                    <stop offset="100%" style="stop-color:#2563eb"/>
+                </linearGradient>
+                <linearGradient id="grad-logic" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#8b5cf6"/>
+                    <stop offset="100%" style="stop-color:#7c3aed"/>
+                </linearGradient>
+                <linearGradient id="grad-end" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#10b981"/>
+                    <stop offset="100%" style="stop-color:#059669"/>
+                </linearGradient>
+            </defs>
+        `;
+
+        // ============ LOCAL STORAGE & PROJECT MANAGEMENT ============
+
+        function loadProjects() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    projects = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error('Failed to load projects:', e);
+                projects = {};
+            }
+        }
+
+        function saveProjects() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+            } catch (e) {
+                console.error('Failed to save projects:', e);
+            }
+        }
+
+        function saveCurrentProject() {
+            if (currentProjectName) {
+                projects[currentProjectName] = JSON.parse(JSON.stringify(treeData));
+                saveProjects();
+            }
+        }
+
+        function loadProject(name) {
+            if (projects[name]) {
+                treeData = JSON.parse(JSON.stringify(projects[name]));
+                currentProjectName = name;
+                branchCache = {};
+                branchPropsCache = {};
+                originalNodeState = null;
+                originalBranchProps = null;
+                layoutTree();
+                renderTree();
+                updateTitle();
+                closeEditPanel();
+                hideProjectDropdown();
+                requestAnimationFrame(() => setTimeout(fitToView, 100));
+            }
+        }
+
+        function createNewProject() {
+            let baseName = "New Project";
+            let name = baseName;
+            let counter = 1;
+            while (projects[name]) {
+                name = `${baseName} ${counter}`;
+                counter++;
+            }
+
+            treeData = createEmptyTree(name);
+            currentProjectName = name;
+            projects[name] = JSON.parse(JSON.stringify(treeData));
+            saveProjects();
+
+            layoutTree();
+            renderTree();
+            updateTitle();
+            hideProjectDropdown();
+            requestAnimationFrame(() => setTimeout(fitToView, 100));
+        }
+
+        function createEmptyTree(name) {
+            const endId = generateId('node');
+            return {
+                name: name,
+                unit: "$",
+                nodes: {
+                    [endId]: {
+                        id: endId,
+                        name: "End",
+                        type: "end",
+                        branches: [],
+                        x: 0,
+                        y: 0
+                    }
+                },
+                rootId: endId,
+                rootBranch: { name: name, value: 0 }
+            };
+        }
+
+        function toggleProjectDropdown(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('projectDropdown');
+            if (dropdown.classList.contains('visible')) {
+                hideProjectDropdown();
+            } else {
+                renderProjectList();
+                dropdown.classList.add('visible');
+            }
+        }
+
+        function hideProjectDropdown() {
+            document.getElementById('projectDropdown').classList.remove('visible');
+            editingProjectName = null;
+            deleteConfirmProject = null;
+        }
+
+        function renderProjectList() {
+            const list = document.getElementById('projectList');
+            const projectNames = Object.keys(projects).sort();
+            
+            list.innerHTML = projectNames.map(name => {
+                const isActive = name === currentProjectName;
+                const isEditing = name === editingProjectName;
+                const isDeleting = name === deleteConfirmProject;
+                
+                if (isEditing) {
+                    return `
+                        <div class="project-item">
+                            <input type="text" class="project-item-input" id="projectRenameInput" value="${escapeHtml(name)}" onkeydown="handleRenameKeydown(event, '${escapeHtml(name)}')">
+                            <button class="project-item-btn confirm" onclick="confirmRename('${escapeHtml(name)}')">✓</button>
+                            <button class="project-item-btn danger" onclick="cancelRename()">✕</button>
+                        </div>
+                        ${isDeleting ? renderDeleteConfirm(name) : ''}
+                    `;
+                }
+                
+                return `
+                    <div class="project-item ${isActive ? 'active' : ''}" onclick="loadProject('${escapeHtml(name)}')">
+                        <span class="project-item-name">${escapeHtml(name)}</span>
+                        <button class="project-item-btn" onclick="startRename(event, '${escapeHtml(name)}')">✎</button>
+                        <button class="project-item-btn danger" onclick="startDelete(event, '${escapeHtml(name)}')">✕</button>
+                    </div>
+                    ${isDeleting ? renderDeleteConfirm(name) : ''}
+                `;
+            }).join('');
+            
+            if (projectNames.length === 0) {
+                list.innerHTML = '<div style="padding:14px;color:#6b7280;font-size:0.8rem;">No projects yet</div>';
+            }
+        }
+
+        function renderDeleteConfirm(name) {
+            return `
+                <div class="delete-confirm visible">
+                    <div class="delete-confirm-text">Delete "${escapeHtml(name)}"?</div>
+                    <div class="delete-confirm-btns">
+                        <button class="yes" onclick="confirmDelete('${escapeHtml(name)}')">Yes, Delete</button>
+                        <button class="no" onclick="cancelDelete()">No</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function startRename(e, name) {
+            e.stopPropagation();
+            editingProjectName = name;
+            deleteConfirmProject = null;
+            renderProjectList();
+            setTimeout(() => {
+                const input = document.getElementById('projectRenameInput');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 10);
+        }
+
+        function handleRenameKeydown(e, oldName) {
+            if (e.key === 'Enter') {
+                confirmRename(oldName);
+            } else if (e.key === 'Escape') {
+                cancelRename();
+            }
+        }
+
+        function confirmRename(oldName) {
+            const input = document.getElementById('projectRenameInput');
+            if (!input) return;
+            
+            const newName = input.value.trim();
+            if (!newName) {
+                alert('Project name cannot be empty');
+                return;
+            }
+            if (newName !== oldName && projects[newName]) {
+                alert('A project with this name already exists');
+                return;
+            }
+            
+            if (newName !== oldName) {
+                projects[newName] = projects[oldName];
+                delete projects[oldName];
+                
+                // Update treeData if renaming current project
+                if (currentProjectName === oldName) {
+                    currentProjectName = newName;
+                    treeData.name = newName;
+                    treeData.rootBranch.name = newName;
+                    updateTitle();
+                    renderTree();
+                }
+                
+                // Update the stored project's internal names
+                projects[newName].name = newName;
+                projects[newName].rootBranch.name = newName;
+                
+                saveProjects();
+            }
+            
+            editingProjectName = null;
+            renderProjectList();
+        }
+
+        function cancelRename() {
+            editingProjectName = null;
+            renderProjectList();
+        }
+
+        function startDelete(e, name) {
+            e.stopPropagation();
+            deleteConfirmProject = name;
+            editingProjectName = null;
+            renderProjectList();
+        }
+
+        function confirmDelete(name) {
+            delete projects[name];
+            saveProjects();
+            
+            if (currentProjectName === name) {
+                const remaining = Object.keys(projects);
+                if (remaining.length > 0) {
+                    loadProject(remaining[0]);
+                } else {
+                    createNewProject();
+                }
+            }
+            
+            deleteConfirmProject = null;
+            renderProjectList();
+        }
+
+        function cancelDelete() {
+            deleteConfirmProject = null;
+            renderProjectList();
+        }
+
+        // ============ UTILITY FUNCTIONS ============
+
+        function isLightMode() {
+            return document.body.classList.contains('light-mode');
+        }
+
+        function getLineColor(alpha = 0.3) {
+            return isLightMode() ? `rgba(100, 100, 100, ${alpha})` : `rgba(255, 255, 255, ${alpha})`;
+        }
+
+        function getDashedLineColor() {
+            return isLightMode() ? 'rgba(79, 70, 229, 0.4)' : 'rgba(79, 70, 229, 0.5)';
+        }
+
+        function generateId(prefix) {
+            return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+
+        function updateTitle() {
+            document.getElementById('appTitle').textContent = treeData.name;
+            document.title = treeData.name;
+        }
+
+        function findParent(nodeId) {
+            for (const id in treeData.nodes) {
+                const node = treeData.nodes[id];
+                for (let i = 0; i < node.branches.length; i++) {
+                    if (node.branches[i].childId === nodeId) {
+                        return { node, branch: node.branches[i], index: i };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function parseNumber(value) {
+            if (value === '' || value === null || value === undefined) return 0;
+            const parsed = parseFloat(value);
+            if (isNaN(parsed)) {
+                throw new Error('Invalid number');
+            }
+            return parsed;
+        }
+
+        function formatValue(value, unit) {
+            const formatted = value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            if (!unit) return formatted;
+            return formatted + ' ' + unit;
+        }
+
+        function formatValueNoUnit(value) {
+            return value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // ============ COPY NODE FUNCTIONS ============
+
+        function buildNodePaths() {
+            const paths = [];
+            
+            function traverse(nodeId, pathParts) {
+                const node = treeData.nodes[nodeId];
+                if (!node || node._hidden) return;
+                
+                paths.push({
+                    id: nodeId,
+                    label: pathParts.join(' → ')
+                });
+                
+                node.branches.forEach(branch => {
+                    if (branch.childId) {
+                        const childNode = treeData.nodes[branch.childId];
+                        if (childNode && !childNode._hidden) {
+                            traverse(branch.childId, [...pathParts, branch.name, childNode.name]);
+                        }
+                    }
+                });
+            }
+            
+            if (treeData.rootId) {
+                const rootNode = treeData.nodes[treeData.rootId];
+                traverse(treeData.rootId, [treeData.rootBranch.name, rootNode.name]);
+            }
+            
+            return paths;
+        }
+
+        function getDescendantIds(nodeId) {
+            const descendants = new Set();
+            const node = treeData.nodes[nodeId];
+            if (!node) return descendants;
+            
+            node.branches.forEach(branch => {
+                if (branch.childId) {
+                    descendants.add(branch.childId);
+                    const childDescendants = getDescendantIds(branch.childId);
+                    childDescendants.forEach(id => descendants.add(id));
+                }
+            });
+            
+            return descendants;
+        }
+
+        function startCopyMode() {
+            if (!selectedNode) return;
+
+            const paths = buildNodePaths();
+            const descendants = getDescendantIds(selectedNode);
+            descendants.add(selectedNode);
+
+            const validTargets = paths.filter(p => !descendants.has(p.id));
+            validCopyTargets = new Set(validTargets.map(t => t.id));
+
+            if (validCopyTargets.size === 0) {
+                alert('No valid target nodes to copy to.');
+                return;
+            }
+
+            copyMode = true;
+            copySourceNode = selectedNode;
+            copyTargetNode = null;
+            showNodeEditPanel(selectedNode);
+        }
+
+        function setTargetNode(nodeId) {
+            if (!validCopyTargets.has(nodeId)) {
+                return;
+            }
+            copyTargetNode = nodeId;
+            renderTree();
+
+            // Update footer to enable Copy button
+            const footer = document.getElementById('nodeCardFooter');
+            const copyBtn = footer.querySelector('.btn-confirm');
+            if (copyBtn) {
+                copyBtn.disabled = false;
+            }
+
+            // Update stats section to show selected target
+            const node = treeData.nodes[copySourceNode];
+            if (node) {
+                showNodeEditPanel(copySourceNode);
+            }
+        }
+
+        function executeCopyMode() {
+            if (!copySourceNode || !copyTargetNode) return;
+            copyNodeTo(copySourceNode, copyTargetNode);
+            exitCopyMode();
+        }
+
+        function exitCopyMode() {
+            copyMode = false;
+            copySourceNode = null;
+            copyTargetNode = null;
+            validCopyTargets = new Set();
+            renderTree();
+        }
+
+        function copyNodeTo(sourceId, targetId) {
+            const sourceNode = treeData.nodes[sourceId];
+            const targetNode = treeData.nodes[targetId];
+            if (!sourceNode || !targetNode) return;
+            
+            targetNode.name = sourceNode.name;
+            targetNode.type = sourceNode.type;
+            
+            targetNode.branches.forEach(branch => {
+                if (branch.childId) deleteNodeRecursive(branch.childId);
+            });
+            
+            targetNode.branches = sourceNode.branches.map(branch => {
+                const newBranch = { ...branch, id: generateId('branch') };
+                if (branch.childId) {
+                    newBranch.childId = deepCopyNode(branch.childId);
+                }
+                return newBranch;
+            });
+            
+            saveCurrentProject();
+            layoutTree();
+            renderTree();
+            closeEditPanel();
+            setTimeout(fitToView, 50);
+        }
+
+        function deepCopyNode(nodeId) {
+            const node = treeData.nodes[nodeId];
+            if (!node) return null;
+            
+            const newId = generateId('node');
+            const newNode = {
+                id: newId,
+                name: node.name,
+                type: node.type,
+                branches: [],
+                x: 0,
+                y: 0
+            };
+            
+            newNode.branches = node.branches.map(branch => {
+                const newBranch = { ...branch, id: generateId('branch') };
+                if (branch.childId) {
+                    newBranch.childId = deepCopyNode(branch.childId);
+                }
+                return newBranch;
+            });
+            
+            treeData.nodes[newId] = newNode;
+            return newId;
+        }
+
+        // ============ NODE & BRANCH OPERATIONS ============
+
+        function addBranchToSelected() {
+            if (!selectedNode) return;
+            addBranch(selectedNode);
+        }
+
+        function addBranch(nodeId) {
+            const node = treeData.nodes[nodeId];
+            if (node.type === 'end') return;
+            
+            const branchId = generateId('branch');
+            const endId = generateId('node');
+            
+            treeData.nodes[endId] = {
+                id: endId,
+                name: "End",
+                type: "end",
+                branches: [],
+                x: 0,
+                y: 0
+            };
+            
+            const newBranch = {
+                id: branchId,
+                name: `Option ${node.branches.length + 1}`,
+                value: 0,
+                childId: endId
+            };
+
+            if (node.type === 'chance' || node.type === 'logic') {
+                newBranch.probability = 0;
+            }
+            if (node.type === 'logic') {
+                newBranch.logic = "";
+            }
+
+            node.branches.push(newBranch);
+            saveCurrentProject();
+            layoutTree();
+            renderTree();
+            updateBranchCard(nodeId);
+            setTimeout(fitToView, 50);
+        }
+
+        function createNodeAtBranch(parentId, branchIndex, type = "end") {
+            const id = generateId('node');
+            const parentNode = treeData.nodes[parentId];
+            
+            treeData.nodes[id] = {
+                id: id,
+                name: type === 'end' ? 'End' : type.charAt(0).toUpperCase() + type.slice(1),
+                type: type,
+                branches: [],
+                x: 0,
+                y: 0
+            };
+
+            parentNode.branches[branchIndex].childId = id;
+            saveCurrentProject();
+            layoutTree();
+            renderTree();
+            selectNode(id);
+            setTimeout(fitToView, 50);
+        }
+
+        function updateNodeFromForm() {
+            if (!selectedNode) return;
+            const node = treeData.nodes[selectedNode];
+            
+            const nameInput = document.getElementById('nodeNameInput');
+            const typeSelect = document.getElementById('nodeTypeSelect');
+            
+            if (nameInput) node.name = nameInput.value;
+            
+            if (typeSelect && typeSelect.value !== node.type) {
+                const oldType = node.type;
+                const newType = typeSelect.value;
+                
+                // Cache current branch properties if switching FROM chance/logic and not already cached
+                // (We want to preserve values set during this edit session too)
+                if ((oldType === 'chance' || oldType === 'logic') && node.branches.length > 0) {
+                    // Update cache with current values (user may have edited them)
+                    branchPropsCache[selectedNode] = node.branches.map(b => ({
+                        id: b.id,
+                        probability: b.probability,
+                        logic: b.logic
+                    }));
+                }
+                
+                if (newType === 'end') {
+                    if (node.branches.length > 0) {
+                        branchCache[selectedNode] = {
+                            branches: JSON.parse(JSON.stringify(node.branches)),
+                            previousType: oldType
+                        };
+                    }
+                    node.branches.forEach(b => {
+                        if (b.childId) hideNodeRecursive(b.childId);
+                    });
+                    node.branches = [];
+                } else {
+                    if (oldType === 'end' && branchCache[selectedNode]) {
+                        const cached = branchCache[selectedNode];
+                        node.branches = cached.branches;
+                        node.branches.forEach(b => {
+                            if (b.childId) showNodeRecursive(b.childId);
+                        });
+                        delete branchCache[selectedNode];
+                    }
+                    
+                    // Update branch properties for new type
+                    node.branches.forEach(branch => {
+                        if (newType === 'chance' || newType === 'logic') {
+                            // Try to restore cached probability
+                            if (branch.probability === undefined) {
+                                const cachedProps = branchPropsCache[selectedNode];
+                                const cached = cachedProps?.find(c => c.id === branch.id);
+                                branch.probability = cached?.probability ?? 0;
+                            }
+                        }
+                        if (newType === 'logic') {
+                            // Try to restore cached logic
+                            if (branch.logic === undefined) {
+                                const cachedProps = branchPropsCache[selectedNode];
+                                const cached = cachedProps?.find(c => c.id === branch.id);
+                                branch.logic = cached?.logic ?? "";
+                            }
+                        }
+                        if (newType === 'decision') {
+                            // Don't delete, just don't display - values preserved in cache
+                            delete branch.probability;
+                            delete branch.logic;
+                        }
+                    });
+                }
+                node.type = newType;
+                layoutTree();
+                renderTree();
+                showNodeEditPanel(selectedNode);
+                return;
+            }
+            
+            renderTree();
+        }
+
+        function updateBranchField(nodeId, branchIndex, field, value) {
+            const node = treeData.nodes[nodeId];
+            if (!node || !node.branches[branchIndex]) return;
+            
+            const input = event ? event.target : null;
+            
+            try {
+                if (field === 'probability' || field === 'value') {
+                    value = parseNumber(value);
+                }
+                node.branches[branchIndex][field] = value;
+                if (input) {
+                    input.classList.remove('error');
+                    const errorEl = input.parentElement.querySelector('.error-message');
+                    if (errorEl) errorEl.remove();
+                }
+                renderTree();
+                updateBranchSum(nodeId);
+            } catch (e) {
+                if (input) {
+                    input.classList.add('error');
+                    let errorEl = input.parentElement.querySelector('.error-message');
+                    if (!errorEl) {
+                        errorEl = document.createElement('div');
+                        errorEl.className = 'error-message';
+                        input.parentElement.appendChild(errorEl);
+                    }
+                    errorEl.textContent = e.message;
+                }
+            }
+        }
+
+        function updateBranchSum(nodeId) {
+            const node = treeData.nodes[nodeId];
+            if (!node || (node.type !== 'chance' && node.type !== 'logic')) return;
+            
+            const sum = node.branches.reduce((s, b) => s + (b.probability || 0), 0);
+            const sumEl = document.getElementById('branchSumValue');
+            if (sumEl) {
+                sumEl.textContent = sum.toFixed(1) + ' %';
+                sumEl.className = 'branch-sum-value ' + (Math.abs(sum - 100) < 0.01 ? 'valid' : 'invalid');
+            }
+        }
+
+        function hideNodeRecursive(nodeId) {
+            const node = treeData.nodes[nodeId];
+            if (!node) return;
+            node._hidden = true;
+            node.branches.forEach(b => {
+                if (b.childId) hideNodeRecursive(b.childId);
+            });
+        }
+
+        function showNodeRecursive(nodeId) {
+            const node = treeData.nodes[nodeId];
+            if (!node) return;
+            delete node._hidden;
+            node.branches.forEach(b => {
+                if (b.childId) showNodeRecursive(b.childId);
+            });
+        }
+
+        function applyChanges() {
+            if (copyMode) return;
+            if (selectedRootBranch) {
+                applyRootBranchChanges();
+            } else if (selectedNode) {
+                applyNodeChanges();
+            }
+        }
+
+        function applyNodeChanges() {
+            if (!selectedNode) return;
+            updateNodeFromForm();
+            
+            const node = treeData.nodes[selectedNode];
+            if (node && node.type === 'end' && branchCache[selectedNode]) {
+                const cached = branchCache[selectedNode];
+                cached.branches.forEach(b => {
+                    if (b.childId) deleteNodeRecursive(b.childId);
+                });
+                delete branchCache[selectedNode];
+            }
+            
+            // Clear caches since changes are confirmed
+            delete branchPropsCache[selectedNode];
+            originalBranchProps = null;
+            
+            saveCurrentProject();
+            layoutTree();
+            renderTree();
+            closeEditPanel();
+            setTimeout(fitToView, 50);
+        }
+
+        function applyRootBranchChanges() {
+            const branchNameInput = document.getElementById('rootBranchNameInput');
+            const unitInput = document.getElementById('unitInput');
+            const branchValueInput = document.getElementById('rootBranchValueInput');
+            
+            try {
+                if (branchNameInput) {
+                    const newName = branchNameInput.value.trim();
+                    if (!newName) throw new Error('Name cannot be empty');
+                    
+                    // Check for duplicate project names
+                    if (newName !== currentProjectName && projects[newName]) {
+                        throw new Error('A project with this name already exists');
+                    }
+                    
+                    // Update project name in storage
+                    if (newName !== currentProjectName) {
+                        delete projects[currentProjectName];
+                        currentProjectName = newName;
+                    }
+                    
+                    treeData.rootBranch.name = newName;
+                    treeData.name = newName;
+                    updateTitle();
+                }
+                if (unitInput) treeData.unit = unitInput.value;
+                if (branchValueInput) {
+                    treeData.rootBranch.value = parseNumber(branchValueInput.value);
+                }
+                
+                saveCurrentProject();
+                renderTree();
+                closeEditPanel();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        function deleteBranch(nodeId, branchIndex) {
+            const node = treeData.nodes[nodeId];
+            const branch = node.branches[branchIndex];
+            
+            if (branch.childId) {
+                deleteNodeRecursive(branch.childId);
+            }
+            
+            node.branches.splice(branchIndex, 1);
+            saveCurrentProject();
+            layoutTree();
+            renderTree();
+            updateBranchCard(nodeId);
+            setTimeout(fitToView, 50);
+        }
+
+        function toggleDeleteConfirm(nodeId) {
+            const dialog = document.getElementById('deleteConfirmDialog');
+            if (dialog) {
+                dialog.style.display = dialog.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function confirmDeleteNode(nodeId) {
+            deleteNode(nodeId);
+        }
+
+        function deleteNode(nodeId) {
+            const parentInfo = findParent(nodeId);
+            
+            if (parentInfo) {
+                const node = treeData.nodes[nodeId];
+                const firstChildId = node.branches.length > 0 ? node.branches[0].childId : null;
+                parentInfo.branch.childId = firstChildId;
+                
+                for (let i = 1; i < node.branches.length; i++) {
+                    if (node.branches[i].childId) deleteNodeRecursive(node.branches[i].childId);
+                }
+                delete treeData.nodes[nodeId];
+            } else {
+                const node = treeData.nodes[nodeId];
+                if (node.branches.length > 0 && node.branches[0].childId) {
+                    treeData.rootId = node.branches[0].childId;
+                    for (let i = 1; i < node.branches.length; i++) {
+                        if (node.branches[i].childId) deleteNodeRecursive(node.branches[i].childId);
+                    }
+                    delete treeData.nodes[nodeId];
+                } else {
+                    return;
+                }
+            }
+
+            saveCurrentProject();
+            layoutTree();
+            renderTree();
+            closeEditPanel();
+            setTimeout(fitToView, 50);
+        }
+
+        function deleteNodeRecursive(nodeId) {
+            const node = treeData.nodes[nodeId];
+            if (!node) return;
+            node.branches.forEach(branch => {
+                if (branch.childId) deleteNodeRecursive(branch.childId);
+            });
+            delete treeData.nodes[nodeId];
+        }
+
+        // ============ CALCULATIONS ============
+
+        function calculateExpectedValue(nodeId) {
+            const node = treeData.nodes[nodeId];
+            if (!node || node._hidden || node.type === 'end' || node.branches.length === 0) return 0;
+
+            if (node.type === 'chance' || node.type === 'logic') {
+                let ev = 0;
+                node.branches.forEach(branch => {
+                    const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
+                    if (childNode && childNode._hidden) return;
+                    
+                    const prob = (branch.probability || 0) / 100;
+                    const branchValue = branch.value || 0;
+                    const childEV = branch.childId ? calculateExpectedValue(branch.childId) : 0;
+                    ev += prob * (branchValue + childEV);
+                });
+                return ev;
+            }
+
+            if (node.type === 'decision') {
+                let maxValue = -Infinity;
+                node.branches.forEach(branch => {
+                    const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
+                    if (childNode && childNode._hidden) return;
+                    
+                    const branchValue = branch.value || 0;
+                    const childEV = branch.childId ? calculateExpectedValue(branch.childId) : 0;
+                    maxValue = Math.max(maxValue, branchValue + childEV);
+                });
+                return maxValue === -Infinity ? 0 : maxValue;
+            }
+            return 0;
+        }
+
+        function calculateEndNodeStats(nodeId) {
+            function findPath(currentId, targetId, prob, value) {
+                if (currentId === targetId) {
+                    return { prob, value };
+                }
+                const node = treeData.nodes[currentId];
+                if (!node || node._hidden) return null;
+                
+                for (const branch of node.branches) {
+                    if (branch.childId) {
+                        const childNode = treeData.nodes[branch.childId];
+                        if (childNode && childNode._hidden) continue;
+                        
+                        let newProb = prob;
+                        if (node.type === 'chance' || node.type === 'logic') {
+                            newProb = prob * (branch.probability || 0) / 100;
+                        }
+                        const newValue = value + (branch.value || 0);
+                        const result = findPath(branch.childId, targetId, newProb, newValue);
+                        if (result) return result;
+                    }
+                }
+                return null;
+            }
+            
+            const result = findPath(treeData.rootId, nodeId, 100, treeData.rootBranch.value || 0);
+            return result || { prob: 0, value: 0 };
+        }
+
+        // ============ LAYOUT & RENDERING ============
+
+        function layoutTree() {
+            if (!treeData.rootId) return;
+            
+            function getSubtreeHeight(nodeId) {
+                const node = treeData.nodes[nodeId];
+                if (!node || node._hidden || node.branches.length === 0) return MARKER_SIZE;
+                
+                let totalHeight = 0;
+                node.branches.forEach((branch, i) => {
+                    const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
+                    if (childNode && !childNode._hidden) {
+                        totalHeight += getSubtreeHeight(branch.childId);
+                    } else {
+                        totalHeight += MARKER_SIZE;
+                    }
+                    if (i < node.branches.length - 1) totalHeight += SIBLING_GAP;
+                });
+                return Math.max(totalHeight, MARKER_SIZE);
+            }
+
+            function positionNode(nodeId, x, y) {
+                const node = treeData.nodes[nodeId];
+                if (!node || node._hidden) return;
+                
+                node.x = x;
+                node.y = y;
+                
+                if (node.branches.length === 0) return;
+                
+                const subtreeHeight = getSubtreeHeight(nodeId);
+                let currentY = y - subtreeHeight / 2 + MARKER_SIZE / 2;
+                
+                node.branches.forEach((branch) => {
+                    const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
+                    if (childNode && !childNode._hidden) {
+                        const childHeight = getSubtreeHeight(branch.childId);
+                        positionNode(branch.childId, x + BRANCH_LENGTH, currentY + childHeight / 2 - MARKER_SIZE / 2);
+                        currentY += childHeight + SIBLING_GAP;
+                    } else {
+                        currentY += MARKER_SIZE + SIBLING_GAP;
+                    }
+                });
+            }
+            
+            const treeHeight = getSubtreeHeight(treeData.rootId);
+            const startY = Math.max(100, treeHeight / 2 + 50);
+            positionNode(treeData.rootId, ROOT_X + BRANCH_LENGTH, startY);
+        }
+
+        function renderTree() {
+            const canvas = document.getElementById('treeCanvas');
+            const svg = document.getElementById('connectionsSvg');
+            
+            Array.from(canvas.children).forEach(child => {
+                if (child.id !== 'connectionsSvg') child.remove();
+            });
+            svg.innerHTML = gradients;
+            
+            if (!treeData.rootId) return;
+
+            renderRootBranch();
+            
+            for (const id in treeData.nodes) {
+                const node = treeData.nodes[id];
+                if (node._hidden) continue;
+                node.branches.forEach((branch, index) => renderBranch(node, branch, index));
+            }
+            
+            for (const id in treeData.nodes) {
+                const node = treeData.nodes[id];
+                if (node._hidden) continue;
+                renderNode(node);
+            }
+            
+            let maxX = 0, maxY = 0;
+            for (const id in treeData.nodes) {
+                const node = treeData.nodes[id];
+                if (node._hidden) continue;
+                maxX = Math.max(maxX, node.x + 250);
+                maxY = Math.max(maxY, node.y + 100);
+            }
+            canvas.style.width = Math.max(maxX, 800) + 'px';
+            canvas.style.height = Math.max(maxY, 400) + 'px';
+            svg.setAttribute('width', Math.max(maxX, 800));
+            svg.setAttribute('height', Math.max(maxY, 400));
+
+            renderLegend();
+        }
+
+        function renderRootBranch() {
+            const svg = document.getElementById('connectionsSvg');
+            const canvas = document.getElementById('treeCanvas');
+            const rootNode = treeData.nodes[treeData.rootId];
+            
+            const startX = ROOT_X;
+            const startY = rootNode.y + MARKER_SIZE / 2;
+            const endX = rootNode.x;
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', startX);
+            line.setAttribute('y1', startY);
+            line.setAttribute('x2', endX);
+            line.setAttribute('y2', startY);
+            line.setAttribute('stroke', getLineColor(0.4));
+            line.setAttribute('stroke-width', '2');
+            svg.appendChild(line);
+
+            const nameLabel = document.createElement('div');
+            nameLabel.className = 'branch-name';
+            nameLabel.style.left = (startX + 10) + 'px';
+            nameLabel.style.top = (startY - 16) + 'px';
+            nameLabel.textContent = treeData.rootBranch.name;
+            nameLabel.onclick = (e) => { e.stopPropagation(); selectRootBranch(); };
+            canvas.appendChild(nameLabel);
+
+            if (treeData.rootBranch.value !== 0) {
+                const valLabel = document.createElement('div');
+                valLabel.className = 'branch-val';
+                valLabel.style.left = (endX - 10) + 'px';
+                valLabel.style.top = (startY + 4) + 'px';
+                valLabel.style.transform = 'translateX(-100%)';
+                valLabel.textContent = formatValueNoUnit(treeData.rootBranch.value);
+                canvas.appendChild(valLabel);
+            }
+        }
+
+        function renderBranch(parentNode, branch, branchIndex) {
+            const svg = document.getElementById('connectionsSvg');
+            const canvas = document.getElementById('treeCanvas');
+            
+            const startX = parentNode.x + MARKER_SIZE / 2;
+            const startY = parentNode.y + MARKER_SIZE / 2;
+            
+            let endX, endY;
+            let hasChild = !!branch.childId;
+            
+            if (hasChild) {
+                const childNode = treeData.nodes[branch.childId];
+                if (childNode._hidden) return;
+                endX = childNode.x;
+                endY = childNode.y + MARKER_SIZE / 2;
+            } else {
+                const numBranches = parentNode.branches.length;
+                const totalHeight = (numBranches - 1) * SIBLING_GAP;
+                endX = parentNode.x + BRANCH_LENGTH;
+                endY = parentNode.y + MARKER_SIZE / 2 - totalHeight / 2 + branchIndex * SIBLING_GAP;
+            }
+
+            const horizStartX = endX - HORIZONTAL_LENGTH;
+            
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${startX} ${startY} L ${horizStartX} ${endY} L ${endX} ${endY}`);
+            path.setAttribute('stroke', hasChild ? getLineColor(0.3) : getDashedLineColor());
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('fill', 'none');
+            if (!hasChild) path.setAttribute('stroke-dasharray', '5,5');
+            svg.appendChild(path);
+
+            const nameLabel = document.createElement('div');
+            nameLabel.className = 'branch-name';
+            nameLabel.style.left = (horizStartX + 8) + 'px';
+            nameLabel.style.top = (endY - 16) + 'px';
+            nameLabel.textContent = branch.name;
+            nameLabel.onclick = (e) => { e.stopPropagation(); selectNode(parentNode.id); };
+            canvas.appendChild(nameLabel);
+
+            if (hasChild) {
+                const showProb = (parentNode.type === 'chance' || parentNode.type === 'logic') && branch.probability !== undefined;
+                const showVal = branch.value !== 0;
+                
+                if (showProb) {
+                    const probLabel = document.createElement('div');
+                    probLabel.className = 'branch-prob';
+                    probLabel.style.left = (endX - 8) + 'px';
+                    probLabel.style.top = (endY - 16) + 'px';
+                    probLabel.style.transform = 'translateX(-100%)';
+                    probLabel.textContent = (branch.probability || 0) + '%';
+                    canvas.appendChild(probLabel);
+                }
+                
+                if (showVal) {
+                    const valLabel = document.createElement('div');
+                    valLabel.className = 'branch-val';
+                    valLabel.style.left = (endX - 8) + 'px';
+                    valLabel.style.top = (endY + 4) + 'px';
+                    valLabel.style.transform = 'translateX(-100%)';
+                    valLabel.textContent = formatValueNoUnit(branch.value);
+                    canvas.appendChild(valLabel);
+                }
+            }
+            
+            if (!hasChild) {
+                const hint = document.createElement('div');
+                hint.className = 'add-node-hint';
+                hint.style.left = (endX - 10) + 'px';
+                hint.style.top = (endY - 10) + 'px';
+                hint.textContent = '+';
+                hint.onclick = (e) => { e.stopPropagation(); showAddNodeMenu(e, parentNode.id, branchIndex); };
+                canvas.appendChild(hint);
+            }
+        }
+
+        function renderNode(node) {
+            const canvas = document.getElementById('treeCanvas');
+
+            const marker = document.createElement('div');
+            let markerClass = 'node-marker';
+            if (copyMode) {
+                if (copyTargetNode === node.id) {
+                    markerClass += ' copy-target';
+                } else if (copySourceNode === node.id) {
+                    markerClass += ' copy-source';
+                }
+            } else if (selectedNode === node.id) {
+                markerClass += ' selected';
+            }
+            marker.className = markerClass;
+            marker.style.left = node.x + 'px';
+            marker.style.top = node.y + 'px';
+            marker.innerHTML = shapes[node.type]();
+            marker.onclick = (e) => {
+                e.stopPropagation();
+                if (copyMode) {
+                    setTargetNode(node.id);
+                } else {
+                    selectNode(node.id);
+                }
+            };
+            canvas.appendChild(marker);
+
+            const infoDiv = document.createElement('div');
+            infoDiv.style.left = (node.x + MARKER_SIZE + 12) + 'px';
+            infoDiv.style.top = (node.y + 2) + 'px';
+            
+            if (node.type === 'end') {
+                const stats = calculateEndNodeStats(node.id);
+                infoDiv.className = 'end-node-info';
+                infoDiv.innerHTML = `
+                    <div class="end-node-prob">${stats.prob.toFixed(1)} %</div>
+                    <div class="end-node-value">${formatValue(stats.value, treeData.unit)}</div>
+                `;
+            } else {
+                const ev = calculateExpectedValue(node.id);
+                infoDiv.className = 'node-info';
+                infoDiv.innerHTML = `
+                    <div class="node-info-name">${escapeHtml(node.name)}</div>
+                    <div class="node-info-value">${formatValue(ev, treeData.unit)}</div>
+                `;
+            }
+            canvas.appendChild(infoDiv);
+        }
+
+        function renderLegend() {
+            const legend = document.getElementById('legend');
+            const typesInTree = new Set();
+            for (const id in treeData.nodes) {
+                const node = treeData.nodes[id];
+                if (!node._hidden) typesInTree.add(node.type);
+            }
+
+            const typeLabels = { chance: 'Chance', decision: 'Decision', logic: 'Logic', end: 'End' };
+            const legendShapes = {
+                chance: `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="url(#grad-chance)"/></svg>`,
+                decision: `<svg viewBox="0 0 16 16"><polygon points="8,1 15,8 8,15 1,8" fill="url(#grad-decision)"/></svg>`,
+                logic: `<svg viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2" fill="url(#grad-logic)"/></svg>`,
+                end: `<svg viewBox="0 0 16 16"><polygon points="1,8 14,1 14,15" fill="url(#grad-end)"/></svg>`
+            };
+
+            legend.innerHTML = `
+                <div class="legend-title">Node Types</div>
+                <div class="legend-items">
+                    ${Array.from(typesInTree).map(type => `
+                        <div class="legend-item">
+                            <div class="legend-shape">${legendShapes[type]}</div>
+                            ${typeLabels[type]}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // ============ ZOOM & PAN ============
+
+        function updateTransform() {
+            document.getElementById('treeCanvas').style.transform = `translate(${currentPan.x}px, ${currentPan.y}px) scale(${currentZoom})`;
+        }
+
+        function zoomIn() { currentZoom = Math.min(currentZoom * 1.2, 3); updateTransform(); }
+        function zoomOut() { currentZoom = Math.max(currentZoom / 1.2, 0.3); updateTransform(); }
+
+        function fitToView() {
+            const viewport = document.getElementById('treeViewport');
+            let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
+            
+            for (const id in treeData.nodes) {
+                const node = treeData.nodes[id];
+                if (node._hidden) continue;
+                minX = Math.min(minX, node.x);
+                minY = Math.min(minY, node.y);
+                maxX = Math.max(maxX, node.x + 150);
+                maxY = Math.max(maxY, node.y + 60);
+            }
+            minX = Math.min(minX, ROOT_X);
+            
+            const treeWidth = maxX - minX + 100;
+            const treeHeight = maxY - minY + 100;
+            const viewWidth = viewport.clientWidth - 40;
+            const viewHeight = viewport.clientHeight - 120;
+            
+            currentZoom = Math.min(Math.max(Math.min(viewWidth / treeWidth, viewHeight / treeHeight), 0.4), 1.5);
+            currentPan.x = (viewWidth - treeWidth * currentZoom) / 2 - (minX - 50) * currentZoom + 20;
+            currentPan.y = (viewHeight - treeHeight * currentZoom) / 2 - (minY - 50) * currentZoom + 60;
+            updateTransform();
+        }
+
+        // ============ SELECTION & EDIT PANELS ============
+
+        function selectNode(nodeId) {
+            selectedNode = nodeId;
+            selectedRootBranch = false;
+            renderTree();
+            showNodeEditPanel(nodeId);
+        }
+
+        function selectRootBranch() {
+            selectedNode = null;
+            selectedRootBranch = true;
+            renderTree();
+            showRootBranchEditPanel();
+        }
+
+        function showNodeEditPanel(nodeId) {
+            const node = treeData.nodes[nodeId];
+            const panel = document.getElementById('editPanel');
+            const nodeBody = document.getElementById('nodeCardBody');
+            const branchCard = document.getElementById('branchCard');
+            const nodeCard = document.getElementById('nodeCard');
+
+            if (copyMode) {
+                document.getElementById('nodeCardHeader').textContent = 'Copy Node';
+            } else {
+                document.getElementById('nodeCardHeader').textContent = 'Node Settings';
+            }
+
+            originalNodeState = {
+                nodeId: nodeId,
+                type: node.type,
+                name: node.name
+            };
+            
+            // Cache original branch properties for restoration on cancel
+            if (node.branches.length > 0) {
+                originalBranchProps = node.branches.map(b => ({
+                    id: b.id,
+                    probability: b.probability,
+                    logic: b.logic
+                }));
+            } else {
+                originalBranchProps = null;
+            }
+            
+            // Also initialize the switch cache if chance/logic
+            if ((node.type === 'chance' || node.type === 'logic') && node.branches.length > 0) {
+                branchPropsCache[nodeId] = node.branches.map(b => ({
+                    id: b.id,
+                    probability: b.probability,
+                    logic: b.logic
+                }));
+            }
+
+            const canDelete = Object.keys(treeData.nodes).length > 1;
+
+            if (copyMode) {
+                // Copy mode UI
+                let copyStatsHtml = '';
+                if (copyTargetNode) {
+                    const targetNode = treeData.nodes[copyTargetNode];
+                    copyStatsHtml = `
+                        <div class="stats-section">
+                            <div class="stat-row">
+                                <span class="stat-label">Target Selected</span>
+                                <span class="stat-value">${escapeHtml(targetNode.name)}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    copyStatsHtml = `
+                        <div class="stats-section" style="color: var(--text-accent); text-align: center; padding: 20px 0;">
+                            Click a node to select as target
+                        </div>
+                    `;
+                }
+
+                nodeBody.innerHTML = `
+                    <div class="form-group">
+                        <label>Source Node</label>
+                        <div style="padding: 8px 10px; background: rgba(79, 70, 229, 0.2); border-radius: 6px; color: var(--text-primary);">${escapeHtml(node.name)}</div>
+                    </div>
+                    ${copyStatsHtml}
+                `;
+            } else {
+                // Normal node settings UI
+                const ev = calculateExpectedValue(nodeId);
+                const branchCount = node.branches.length;
+
+                let statsHtml = '';
+                if (node.type !== 'end') {
+                    statsHtml = `
+                        <div class="stats-section">
+                            <div class="stat-row">
+                                <span class="stat-label">Expected Value</span>
+                                <span class="stat-value">${formatValue(ev, treeData.unit)}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Branches</span>
+                                <span class="stat-value">${branchCount}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const stats = calculateEndNodeStats(nodeId);
+                    statsHtml = `
+                        <div class="stats-section">
+                            <div class="stat-row">
+                                <span class="stat-label">Probability</span>
+                                <span class="stat-value">${stats.prob.toFixed(1)} %</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Outcome Value</span>
+                                <span class="stat-value">${formatValue(stats.value, treeData.unit)}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                nodeBody.innerHTML = `
+                    <div style="display: flex; gap: 6px; margin-bottom: 14px;">
+                        <button class="btn btn-copy" onclick="startCopyMode()" style="flex: 1; padding: 6px 8px; font-size: 0.75rem;">Copy</button>
+                        ${canDelete ? `<button class="btn btn-danger" onclick="toggleDeleteConfirm('${nodeId}')" style="flex: 1; padding: 6px 8px; font-size: 0.75rem; position: relative;">Delete</button>` : ''}
+                    </div>
+                    <div id="deleteConfirmDialog" style="display: none; margin-bottom: 12px;">
+                        <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; padding: 10px; font-size: 0.75rem; color: var(--text-primary);">
+                            <div style="margin-bottom: 8px;">Delete this node?</div>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-cancel" onclick="toggleDeleteConfirm('${nodeId}')" style="flex: 1; padding: 4px;">Cancel</button>
+                                <button class="btn btn-danger" onclick="confirmDeleteNode('${nodeId}')" style="flex: 1; padding: 4px;">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="nodeNameInput" value="${escapeHtml(node.name)}" onchange="updateNodeFromForm()">
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="nodeTypeSelect" onchange="updateNodeFromForm()">
+                            <option value="chance" ${node.type === 'chance' ? 'selected' : ''}>Chance</option>
+                            <option value="decision" ${node.type === 'decision' ? 'selected' : ''}>Decision</option>
+                            <option value="logic" ${node.type === 'logic' ? 'selected' : ''}>Logic</option>
+                            <option value="end" ${node.type === 'end' ? 'selected' : ''}>End</option>
+                        </select>
+                    </div>
+                    ${statsHtml}
+                `;
+            }
+            
+            if (node.type !== 'end') {
+                branchCard.style.display = copyMode ? 'none' : 'flex';
+                if (!copyMode) {
+                    branchCard.style.flexDirection = 'column';
+                    updateBranchCard(nodeId);
+                }
+            } else {
+                branchCard.style.display = 'none';
+            }
+
+            // Update footer buttons based on mode
+            const footer = document.getElementById('nodeCardFooter');
+            if (copyMode) {
+                footer.innerHTML = `
+                    <button class="btn btn-cancel" onclick="closeEditPanel()">Cancel</button>
+                    <button class="btn btn-confirm" onclick="executeCopyMode()" ${!copyTargetNode ? 'disabled' : ''}>Copy</button>
+                `;
+            } else {
+                footer.innerHTML = `
+                    <button class="btn btn-cancel" onclick="cancelEdit()">Cancel</button>
+                    <button class="btn btn-confirm" onclick="applyChanges()">Confirm</button>
+                `;
+            }
+
+            panel.classList.add('visible');
+        }
+
+        function updateBranchCard(nodeId) {
+            const node = treeData.nodes[nodeId];
+            const branchBody = document.getElementById('branchCardBody');
+            
+            if (node.type === 'end' || node.branches.length === 0) {
+                branchBody.innerHTML = `<div style="color:#6b7280;font-size:0.8rem;text-align:center;padding:20px;">No branches yet</div>`;
+                return;
+            }
+
+            const showProb = node.type === 'chance' || node.type === 'logic';
+            const showLogic = node.type === 'logic';
+            
+            let headers = '<th>Name</th>';
+            if (showLogic) headers += '<th>Condition</th>';
+            if (showProb) headers += '<th>%</th>';
+            headers += '<th>Value</th><th></th>';
+
+            const rows = node.branches.map((b, i) => {
+                let cells = `<td><input type="text" class="name-input" data-row="${i}" data-col="0" value="${escapeHtml(b.name)}" onchange="updateBranchField('${nodeId}', ${i}, 'name', this.value)"></td>`;
+                let colIdx = 1;
+                if (showLogic) {
+                    cells += `<td><input type="text" class="name-input" data-row="${i}" data-col="${colIdx}" value="${escapeHtml(b.logic || '')}" onchange="updateBranchField('${nodeId}', ${i}, 'logic', this.value)"></td>`;
+                    colIdx++;
+                }
+                if (showProb) {
+                    cells += `<td><input type="text" class="number-input" data-row="${i}" data-col="${colIdx}" value="${b.probability || 0}" onchange="updateBranchField('${nodeId}', ${i}, 'probability', this.value)"></td>`;
+                    colIdx++;
+                }
+                cells += `<td><input type="text" class="number-input" data-row="${i}" data-col="${colIdx}" value="${b.value || 0}" onchange="updateBranchField('${nodeId}', ${i}, 'value', this.value)"></td>`;
+                cells += `<td><button class="delete-btn" onclick="deleteBranch('${nodeId}', ${i})">×</button></td>`;
+                return `<tr>${cells}</tr>`;
+            }).join('');
+
+            let sumHtml = '';
+            if (showProb) {
+                const sum = node.branches.reduce((s, b) => s + (b.probability || 0), 0);
+                const valid = Math.abs(sum - 100) < 0.01;
+                sumHtml = `
+                    <div class="branch-sum">
+                        <span class="branch-sum-label">Probability Sum</span>
+                        <span id="branchSumValue" class="branch-sum-value ${valid ? 'valid' : 'invalid'}">${sum.toFixed(1)} %</span>
+                    </div>
+                `;
+            }
+
+            branchBody.innerHTML = `
+                <table class="branch-table">
+                    <thead><tr>${headers}</tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                ${sumHtml}
+            `;
+
+            setupArrowKeyNavigation();
+        }
+
+        function setupArrowKeyNavigation() {
+            const inputs = document.querySelectorAll('.branch-table input');
+            inputs.forEach(input => {
+                input.addEventListener('keydown', (e) => {
+                    const row = parseInt(input.dataset.row);
+                    const col = parseInt(input.dataset.col);
+                    let targetRow = row, targetCol = col;
+
+                    if (e.key === 'ArrowDown') { targetRow++; e.preventDefault(); }
+                    else if (e.key === 'ArrowUp') { targetRow--; e.preventDefault(); }
+                    else if (e.key === 'ArrowRight' && input.selectionStart === input.value.length) { targetCol++; e.preventDefault(); }
+                    else if (e.key === 'ArrowLeft' && input.selectionStart === 0) { targetCol--; e.preventDefault(); }
+                    else if (e.key === 'Tab') {
+                        if (e.shiftKey) { targetCol--; } else { targetCol++; }
+                        e.preventDefault();
+                    }
+                    else return;
+
+                    const target = document.querySelector(`.branch-table input[data-row="${targetRow}"][data-col="${targetCol}"]`);
+                    if (target) { target.focus(); target.select(); }
+                });
+            });
+        }
+
+        function showRootBranchEditPanel() {
+            const panel = document.getElementById('editPanel');
+            const nodeBody = document.getElementById('nodeCardBody');
+            const branchCard = document.getElementById('branchCard');
+            
+            document.getElementById('nodeCardHeader').textContent = 'Root Branch Settings';
+            branchCard.style.display = 'none';
+            hideCopyCard();
+            
+            nodeBody.innerHTML = `
+                <div class="form-group">
+                    <label>Name (Project Title)</label>
+                    <input type="text" id="rootBranchNameInput" value="${escapeHtml(treeData.rootBranch.name)}">
+                </div>
+                <div class="form-group">
+                    <label>Unit</label>
+                    <input type="text" id="unitInput" value="${escapeHtml(treeData.unit)}" placeholder="e.g. $, €, kr">
+                </div>
+                <div class="form-group">
+                    <label>Value</label>
+                    <input type="text" id="rootBranchValueInput" value="${treeData.rootBranch.value || 0}">
+                </div>
+            `;
+            
+            panel.classList.add('visible');
+        }
+
+        function cancelEdit() {
+            if (copyMode) {
+                exitCopyMode();
+                return;
+            }
+
+            if (selectedNode && originalNodeState) {
+                const node = treeData.nodes[selectedNode];
+
+                // Restore original type and name
+                node.type = originalNodeState.type;
+                node.name = originalNodeState.name;
+
+                // Restore branches if cached (from switching to end type)
+                if (branchCache[selectedNode]) {
+                    const cached = branchCache[selectedNode];
+                    node.branches = cached.branches;
+                    node.branches.forEach(b => {
+                        if (b.childId) showNodeRecursive(b.childId);
+                    });
+                    delete branchCache[selectedNode];
+                }
+
+                // Restore original probability/logic values
+                if (originalBranchProps) {
+                    node.branches.forEach(branch => {
+                        const original = originalBranchProps.find(o => o.id === branch.id);
+                        if (original) {
+                            if (original.probability !== undefined) branch.probability = original.probability;
+                            else delete branch.probability;
+                            if (original.logic !== undefined) branch.logic = original.logic;
+                            else delete branch.logic;
+                        }
+                    });
+                }
+
+                delete branchPropsCache[selectedNode];
+            }
+
+            closeEditPanel();
+        }
+
+        function closeEditPanel() {
+            document.getElementById('editPanel').classList.remove('visible');
+            if (selectedNode) {
+                delete branchPropsCache[selectedNode];
+            }
+            selectedNode = null;
+            selectedRootBranch = false;
+            originalNodeState = null;
+            originalBranchProps = null;
+            copyMode = false;
+            copySourceNode = null;
+            copyTargetNode = null;
+            validCopyTargets = new Set();
+            layoutTree();
+            renderTree();
+        }
+
+        // ============ MENUS ============
+
+        function showAddNodeMenu(e, parentId, branchIndex) {
+            const menu = document.getElementById('contextMenu');
+            menu.innerHTML = `
+                <div class="context-menu-item" onclick="createNodeAtBranch('${parentId}', ${branchIndex}, 'chance'); hideContextMenu();">Chance</div>
+                <div class="context-menu-item" onclick="createNodeAtBranch('${parentId}', ${branchIndex}, 'decision'); hideContextMenu();">Decision</div>
+                <div class="context-menu-item" onclick="createNodeAtBranch('${parentId}', ${branchIndex}, 'logic'); hideContextMenu();">Logic</div>
+                <div class="context-menu-item" onclick="createNodeAtBranch('${parentId}', ${branchIndex}, 'end'); hideContextMenu();">End</div>
+            `;
+            menu.style.left = e.clientX + 'px';
+            menu.style.right = 'auto';
+            menu.style.top = e.clientY + 'px';
+            menu.classList.add('visible');
+        }
+
+        function hideContextMenu() {
+            document.getElementById('contextMenu').classList.remove('visible');
+        }
+
+        // ============ IMPORT / EXPORT ============
+
+        function exportTree() {
+            const cleanData = JSON.parse(JSON.stringify(treeData));
+            for (const id in cleanData.nodes) {
+                if (cleanData.nodes[id]._hidden) {
+                    delete cleanData.nodes[id];
+                } else {
+                    delete cleanData.nodes[id]._hidden;
+                }
+            }
+            
+            const blob = new Blob([JSON.stringify(cleanData, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${treeData.name.replace(/[^a-z0-9]/gi, '_')}.json`;
+            a.click();
+        }
+
+        function importTree() {
+            document.getElementById('importInput').click();
+        }
+
+        function handleImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    
+                    // Check for duplicate project name
+                    let name = imported.rootBranch ? imported.rootBranch.name : imported.name;
+                    let counter = 1;
+                    const baseName = name;
+                    while (projects[name]) {
+                        name = `${baseName} (${counter})`;
+                        counter++;
+                    }
+                    
+                    imported.name = name;
+                    if (imported.rootBranch) imported.rootBranch.name = name;
+                    
+                    treeData = imported;
+                    currentProjectName = name;
+                    projects[name] = JSON.parse(JSON.stringify(treeData));
+                    saveProjects();
+                    
+                    branchCache = {};
+                    branchPropsCache = {};
+                    originalNodeState = null;
+                    originalBranchProps = null;
+                    layoutTree();
+                    renderTree();
+                    updateTitle();
+                    setTimeout(fitToView, 100);
+                } catch (err) { 
+                    alert('Invalid file: ' + err.message); 
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // ============ DARK MODE ============
+
+        function toggleDarkMode() {
+            const isDarkMode = document.body.classList.contains('light-mode');
+            if (isDarkMode) {
+                document.body.classList.remove('light-mode');
+                localStorage.setItem('darkMode', 'true');
+                updateDarkModeToggle();
+            } else {
+                document.body.classList.add('light-mode');
+                localStorage.setItem('darkMode', 'false');
+                updateDarkModeToggle();
+            }
+            // Re-generate shapes with new stroke colors
+            shapes = getShapes();
+            // Re-render tree to update SVG colors
+            layoutTree();
+            renderTree();
+        }
+
+        function updateDarkModeToggle() {
+            const toggle = document.getElementById('darkModeToggle');
+            if (toggle) {
+                const isDarkMode = document.body.classList.contains('light-mode');
+                toggle.textContent = isDarkMode ? '☀️' : '🌙';
+                toggle.title = isDarkMode ? 'Toggle Light Mode' : 'Toggle Dark Mode';
+            }
+        }
+
+        function initDarkMode() {
+            const savedMode = localStorage.getItem('darkMode');
+            if (savedMode === 'false') {
+                document.body.classList.add('light-mode');
+            }
+            updateDarkModeToggle();
+        }
+
+        // ============ EVENT LISTENERS ============
+
+        document.addEventListener('click', (e) => {
+            hideContextMenu();
+            if (!e.target.closest('.project-dropdown') && !e.target.closest('.header h1')) {
+                hideProjectDropdown();
+            }
+        });
+
+        window.addEventListener('resize', () => setTimeout(fitToView, 100));
+
+        // Drag to pan
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let panStartX = 0;
+        let panStartY = 0;
+
+        const viewport = document.getElementById('treeViewport');
+
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.node-marker, .branch-name, .add-node-hint, .edit-panel, .context-menu')) return;
+            
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            panStartX = currentPan.x;
+            panStartY = currentPan.y;
+            viewport.classList.add('dragging');
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const dx = e.clientX - dragStartX;
+            const dy = e.clientY - dragStartY;
+            currentPan.x = panStartX + dx;
+            currentPan.y = panStartY + dy;
+            
+            const canvas = document.getElementById('treeCanvas');
+            canvas.style.transition = 'none';
+            updateTransform();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                viewport.classList.remove('dragging');
+                const canvas = document.getElementById('treeCanvas');
+                canvas.style.transition = 'transform 0.3s ease';
+            }
+        });
+
+        // ============ INITIALIZATION ============
+
+        function init() {
+            initDarkMode();
+            // Regenerate shapes after dark mode is initialized so strokes are correct
+            shapes = getShapes();
+            loadProjects();
+
+            const projectNames = Object.keys(projects);
+            if (projectNames.length > 0) {
+                loadProject(projectNames[0]);
+            } else {
+                createNewProject();
+            }
+
+            // fitToView is already called by loadProject, so we're all set
+        }
+
+        init();
+    </script>
+</body>
+</html>
