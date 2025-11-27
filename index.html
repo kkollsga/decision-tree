@@ -1238,6 +1238,10 @@
         function loadProject(name) {
             if (projects[name]) {
                 treeData = JSON.parse(JSON.stringify(projects[name]));
+                // Ensure orientation property exists (for backward compatibility)
+                if (!treeData.orientation) {
+                    treeData.orientation = 'horizontal';
+                }
                 currentProjectName = name;
                 branchCache = {};
                 branchPropsCache = {};
@@ -3481,7 +3485,11 @@
                     
                     imported.name = name;
                     if (imported.rootBranch) imported.rootBranch.name = name;
-                    
+                    // Ensure orientation property exists (for backward compatibility)
+                    if (!imported.orientation) {
+                        imported.orientation = 'horizontal';
+                    }
+
                     treeData = imported;
                     currentProjectName = name;
                     projects[name] = JSON.parse(JSON.stringify(treeData));
