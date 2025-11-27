@@ -1653,7 +1653,7 @@
 
         function updateTitle() {
             document.getElementById('appTitle').textContent = treeData.name;
-            document.title = treeData.name;
+            document.title = 'Decision Tree - ' + treeData.name;
         }
 
         function findParent(nodeId) {
@@ -2606,17 +2606,19 @@
                 if (node.branches.length === 0) return;
 
                 const subtreeWidth = getSubtreeWidth(nodeId);
-                let currentX = x - subtreeWidth / 2 + MARKER_SIZE / 2;
+                // Start from right side (for branch 0/Option 1 to be on the right)
+                let currentX = x + subtreeWidth / 2 - MARKER_SIZE / 2;
 
+                // Iterate branches in normal order but position right to left
                 node.branches.forEach((branch) => {
                     const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
                     if (childNode && !childNode._hidden) {
                         const childWidth = getSubtreeWidth(branch.childId);
                         // Position child directly at branch end using configured vertical spacing
-                        positionNode(branch.childId, currentX + childWidth / 2 - MARKER_SIZE / 2, y + treeSettings.vertical.nodeGap + treeSettings.vertical.branchLength);
-                        currentX += childWidth + getSiblingSpacing('vertical');
+                        positionNode(branch.childId, currentX - childWidth / 2 + MARKER_SIZE / 2, y + treeSettings.vertical.nodeGap + treeSettings.vertical.branchLength);
+                        currentX -= childWidth + getSiblingSpacing('vertical');
                     } else {
-                        currentX += MARKER_SIZE + getSiblingSpacing('vertical');
+                        currentX -= MARKER_SIZE + getSiblingSpacing('vertical');
                     }
                 });
             }
@@ -2856,7 +2858,8 @@
                 const numBranches = parentNode.branches.length;
                 const siblingSpacing = getSiblingSpacing('vertical');
                 const totalWidth = (numBranches - 1) * siblingSpacing;
-                childX = parentCenter.x - totalWidth / 2 + branchIndex * siblingSpacing;
+                // Position from right to left (branch 1 on the right)
+                childX = parentCenter.x + totalWidth / 2 - branchIndex * siblingSpacing;
                 childY = parentNode.y + treeSettings.vertical.nodeGap + treeSettings.vertical.branchLength;
             }
 
@@ -2917,8 +2920,8 @@
             if (!hasChild) {
                 const hint = document.createElement('div');
                 hint.className = 'add-node-hint';
-                hint.style.left = (endX - 10) + 'px';
-                hint.style.top = (endY - 10) + 'px';
+                hint.style.left = (childX - 10) + 'px';
+                hint.style.top = (childY - 10) + 'px';
                 hint.textContent = '+';
                 hint.onclick = (e) => { e.stopPropagation(); showAddNodeMenu(e, parentNode.id, branchIndex); };
                 canvas.appendChild(hint);
