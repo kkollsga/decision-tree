@@ -333,10 +333,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            --rotation: 0deg;
+            transform: rotate(var(--rotation));
         }
 
         .node-marker:hover {
-            transform: scale(1.15);
+            transform: rotate(var(--rotation)) scale(1.15);
             filter: brightness(1.2);
         }
 
@@ -369,6 +371,7 @@
             position: absolute;
             z-index: 6;
             pointer-events: none;
+            text-align: center;
         }
 
         .node-info-name {
@@ -396,6 +399,7 @@
             position: absolute;
             z-index: 6;
             pointer-events: none;
+            text-align: center;
         }
 
         .end-node-prob {
@@ -521,6 +525,16 @@
         @keyframes slideUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(30px); }
         }
 
         .card {
@@ -1077,17 +1091,10 @@
         <button class="zoom-btn" onclick="zoomIn()">+</button>
         <button class="zoom-btn" onclick="zoomOut()">−</button>
         <button class="zoom-btn" onclick="fitToView()">⊡</button>
+        <button class="zoom-btn" id="orientationBtn" onclick="toggleOrientation()" title="Toggle tree orientation">↔</button>
     </div>
 
     <div class="edit-panel" id="editPanel">
-        <div class="card copy-card" id="copyCard" style="display:none;">
-            <div class="card-header">Copy To Node</div>
-            <div class="card-body" id="copyCardBody"></div>
-            <div class="card-footer">
-                <button class="btn btn-cancel" onclick="hideCopyCard()">Cancel</button>
-                <button class="btn btn-confirm" onclick="executeCopy()">Copy</button>
-            </div>
-        </div>
         <div class="card" id="nodeCard">
             <div class="card-header" id="nodeCardHeader">Node Settings</div>
             <div class="card-body" id="nodeCardBody"></div>
@@ -1111,8 +1118,10 @@
 
     <script>
         const STORAGE_KEY = 'decisionTreeProjects';
+        const TEMPLATES_STORAGE_KEY = 'decisionTreeTemplates';
 
         let projects = {};
+        let templates = {};
         let currentProjectName = null;
         
         let treeData = {
@@ -1120,7 +1129,8 @@
             unit: "$",
             nodes: {},
             rootId: null,
-            rootBranch: { name: "My Decision Tree", value: 0 }
+            rootBranch: { name: "My Decision Tree", value: 0 },
+            orientation: 'horizontal' // 'horizontal' or 'vertical'
         };
 
         let selectedNode = null;
@@ -1137,12 +1147,31 @@
         let validCopyTargets = new Set();
         let editingProjectName = null;
         let deleteConfirmProject = null;
+        let storingTemplate = false;
+        let editingTemplateName = null;
+        let deleteConfirmTemplate = null;
 
         const MARKER_SIZE = 28;
-        const SIBLING_GAP = 80;
         const ROOT_X = 80;
-        const BRANCH_LENGTH = 220;
-        const HORIZONTAL_LENGTH = 140;
+
+        // ============ TREE LAYOUT SETTINGS ============
+        const treeSettings = {
+            horizontal: {
+                branchLength: 200,      // Length of horizontal branch line
+                nodeGap: 30,             // Gap from node to start of branches
+                branchGap: 2.86,        // Scalar: spacing between siblings = branchGap * MARKER_SIZE
+                endnodeRotation: 0,     // Rotation of end node triangle in degrees
+                branchValOffset: 20      // Horizontal offset from branch end for value text (right-aligned)
+            },
+            vertical: {
+                branchLength: 100,       // Length of vertical branch line segment
+                nodeGap: 18,            // Gap from node to start of branches
+                branchGap: 4,        // Scalar: spacing between siblings = branchGap * MARKER_SIZE
+                endnodeRotation: 90,    // Rotation of end node triangle in degrees
+                branchValOffset: 30,     // Vertical offset from branch end for value text (bottom-anchored)
+                branchNameOffset: -15     // Vertical offset for branch name from center (negative = up, positive = down)
+            }
+        };
 
         function getShapes() {
             const stroke = document.body.classList.contains('light-mode') ? '#374151' : '#fff';
@@ -1260,7 +1289,8 @@
                     }
                 },
                 rootId: endId,
-                rootBranch: { name: name, value: 0 }
+                rootBranch: { name: name, value: 0 },
+                orientation: 'horizontal'
             };
         }
 
@@ -1305,7 +1335,7 @@
                     <div class="project-item ${isActive ? 'active' : ''}" onclick="loadProject('${escapeHtml(name)}')">
                         <span class="project-item-name">${escapeHtml(name)}</span>
                         <button class="project-item-btn" onclick="startRename(event, '${escapeHtml(name)}')">✎</button>
-                        <button class="project-item-btn danger" onclick="startDelete(event, '${escapeHtml(name)}')">✕</button>
+                        <button class="project-item-btn danger" onclick="startDelete(event, '${escapeHtml(name)}')">🗑️</button>
                     </div>
                     ${isDeleting ? renderDeleteConfirm(name) : ''}
                 `;
@@ -1420,6 +1450,183 @@
         function cancelDelete() {
             deleteConfirmProject = null;
             renderProjectList();
+        }
+
+        // ============ TEMPLATE MANAGEMENT ============
+
+        function loadTemplates() {
+            try {
+                const stored = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+                if (stored) {
+                    templates = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error('Failed to load templates:', e);
+                templates = {};
+            }
+        }
+
+        function saveTemplates() {
+            try {
+                localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+            } catch (e) {
+                console.error('Failed to save templates:', e);
+            }
+        }
+
+        function storeNodeAsTemplate(templateName) {
+            if (!templateName || !copySourceNode) return;
+
+            const sourceNode = treeData.nodes[copySourceNode];
+            if (!sourceNode) return;
+
+            // Clone the source node and its entire subtree
+            const clonedNodeId = generateId('template');
+            const templateData = cloneNodeRecursive(copySourceNode, clonedNodeId);
+
+            templates[templateName] = {
+                name: templateName,
+                data: templateData,
+                nodeType: sourceNode.type
+            };
+
+            saveTemplates();
+            showNotification('Node stored as template');
+        }
+
+        function cloneNodeRecursive(sourceId, newId) {
+            const sourceNode = treeData.nodes[sourceId];
+            if (!sourceNode) return null;
+
+            const clonedNode = {
+                id: newId,
+                name: sourceNode.name,
+                type: sourceNode.type,
+                branches: sourceNode.branches.map(branch => ({
+                    ...branch,
+                    childId: branch.childId ? generateId('template') : null
+                }))
+            };
+
+            const childMap = {};
+            sourceNode.branches.forEach((branch, idx) => {
+                if (branch.childId) {
+                    childMap[idx] = cloneNodeRecursive(branch.childId, clonedNode.branches[idx].childId);
+                }
+            });
+
+            return { node: clonedNode, children: childMap };
+        }
+
+        function loadNodeTemplate(templateName) {
+            if (!templateName || !selectedNode) return;
+
+            const template = templates[templateName];
+            if (!template) return;
+
+            const targetNode = treeData.nodes[selectedNode];
+            const oldChildIds = [];
+            targetNode.branches.forEach(b => {
+                if (b.childId) oldChildIds.push(b.childId);
+            });
+
+            // Delete old children
+            oldChildIds.forEach(childId => deleteNodeRecursive(childId));
+
+            // Apply template to target node
+            targetNode.name = template.data.node.name;
+            targetNode.type = template.data.node.type;
+            targetNode.branches = [];
+
+            // Clone the template branches
+            const nodeMap = {};
+            template.data.node.branches.forEach((branch, idx) => {
+                const newChildId = branch.childId ? generateId('node') : null;
+                targetNode.branches.push({
+                    id: generateId('branch'),
+                    name: branch.name,
+                    probability: branch.probability,
+                    logic: branch.logic,
+                    value: branch.value,
+                    childId: newChildId
+                });
+
+                if (branch.childId && template.data.children[idx]) {
+                    nodeMap[idx] = pasteNodeRecursive(template.data.children[idx], newChildId);
+                }
+            });
+
+            layoutTree();
+            renderTree();
+            closeEditPanel();
+            saveCurrentProject();
+        }
+
+        function pasteNodeRecursive(sourceData, parentId) {
+            if (!sourceData) return null;
+
+            const newNode = {
+                id: parentId,
+                name: sourceData.node.name,
+                type: sourceData.node.type,
+                branches: sourceData.node.branches.map(branch => ({
+                    id: generateId('branch'),
+                    name: branch.name,
+                    probability: branch.probability,
+                    logic: branch.logic,
+                    value: branch.value,
+                    childId: branch.childId ? generateId('node') : null
+                })),
+                x: 0,
+                y: 0
+            };
+
+            treeData.nodes[newNode.id] = newNode;
+
+            newNode.branches.forEach((branch, idx) => {
+                if (branch.childId && sourceData.children[idx]) {
+                    pasteNodeRecursive(sourceData.children[idx], branch.childId);
+                }
+            });
+
+            return newNode;
+        }
+
+        function deleteTemplate(templateName) {
+            delete templates[templateName];
+            saveTemplates();
+        }
+
+        function renameTemplate(oldName, newName) {
+            if (!oldName || !newName || !templates[oldName]) return;
+            templates[newName] = templates[oldName];
+            templates[newName].name = newName;
+            delete templates[oldName];
+            saveTemplates();
+        }
+
+        function showNotification(message) {
+            const notif = document.createElement('div');
+            notif.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: var(--text-accent);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                z-index: 9999;
+                font-size: 0.9rem;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                animation: slideIn 0.3s ease-out;
+            `;
+            notif.textContent = message;
+            document.body.appendChild(notif);
+
+            setTimeout(() => {
+                notif.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => notif.remove(), 300);
+            }, 3000);
         }
 
         // ============ UTILITY FUNCTIONS ============
@@ -1586,6 +1793,192 @@
             renderTree();
         }
 
+        function startStoringTemplate() {
+            storingTemplate = true;
+            const inputSection = document.getElementById('templateNameInputSection');
+            if (inputSection) {
+                inputSection.style.display = 'flex';
+                setTimeout(() => {
+                    const input = document.getElementById('templateNameInput');
+                    if (input) {
+                        input.focus();
+                        input.select();
+                    }
+                }, 10);
+            }
+        }
+
+        function confirmStoreTemplate() {
+            const input = document.getElementById('templateNameInput');
+            const templateName = input ? input.value.trim() : '';
+            if (!templateName) {
+                alert('Please enter a template name');
+                return;
+            }
+
+            storeNodeAsTemplate(templateName);
+            cancelStoreTemplate();
+        }
+
+        function cancelStoreTemplate() {
+            storingTemplate = false;
+            const inputSection = document.getElementById('templateNameInputSection');
+            if (inputSection) {
+                inputSection.style.display = 'none';
+            }
+            const input = document.getElementById('templateNameInput');
+            if (input) {
+                input.value = '';
+            }
+        }
+
+        function handleTemplateNameKeydown(e) {
+            if (e.key === 'Enter') {
+                confirmStoreTemplate();
+            } else if (e.key === 'Escape') {
+                cancelStoreTemplate();
+            }
+        }
+
+        function showTemplateDropdown() {
+            const section = document.getElementById('templateDropdownSection');
+            if (section.style.display === 'none') {
+                renderTemplateList();
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+                editingTemplateName = null;
+                deleteConfirmTemplate = null;
+            }
+        }
+
+        function renderTemplateList() {
+            const section = document.getElementById('templateDropdownSection');
+            const templateNames = Object.keys(templates).sort();
+
+            if (templateNames.length === 0) {
+                section.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); font-size: 0.85rem; text-align: center;">No templates yet</div>';
+                return;
+            }
+
+            section.innerHTML = templateNames.map(name => {
+                const isEditing = name === editingTemplateName;
+                const isDeleting = name === deleteConfirmTemplate;
+
+                if (isEditing) {
+                    return `
+                        <div class="template-item">
+                            <input type="text" class="template-item-input" id="templateRenameInput" value="${escapeHtml(name)}" onkeydown="handleTemplateRenameKeydown(event, '${escapeHtml(name)}')">
+                            <button class="template-item-btn confirm" onclick="confirmRenameTemplate('${escapeHtml(name)}')">✓</button>
+                            <button class="template-item-btn danger" onclick="cancelTemplateOperation()">✕</button>
+                        </div>
+                        ${isDeleting ? renderTemplateDeleteConfirm(name) : ''}
+                    `;
+                }
+
+                return `
+                    <div class="template-item" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer;" onmouseover="this.style.background = 'var(--bg-hover)'" onmouseout="this.style.background = ''">
+                        <span class="template-item-name" onclick="loadTemplateFromDropdown('${escapeHtml(name)}')" style="flex: 1; color: var(--text-primary); font-size: 0.85rem;">${escapeHtml(name)}</span>
+                        <button class="template-item-btn" onclick="startRenameTemplate(event, '${escapeHtml(name)}')" style="opacity: 0; transition: opacity 0.2s;" onmouseover="this.style.opacity = '1'" onmouseout="this.style.opacity = '0'">✎</button>
+                        <button class="template-item-btn danger" onclick="startDeleteTemplate(event, '${escapeHtml(name)}')" style="opacity: 0; transition: opacity 0.2s;" onmouseover="this.style.opacity = '1'" onmouseout="this.style.opacity = '0'">🗑️</button>
+                    </div>
+                    ${isDeleting ? renderTemplateDeleteConfirm(name) : ''}
+                `;
+            }).join('');
+
+            // Re-attach hover listeners to parent container
+            setTimeout(() => {
+                const items = section.querySelectorAll('.template-item');
+                items.forEach(item => {
+                    item.addEventListener('mouseenter', function() {
+                        const btns = this.querySelectorAll('.template-item-btn');
+                        btns.forEach(btn => btn.style.opacity = '1');
+                    });
+                    item.addEventListener('mouseleave', function() {
+                        const btns = this.querySelectorAll('.template-item-btn');
+                        btns.forEach(btn => btn.style.opacity = '0');
+                    });
+                });
+            }, 10);
+        }
+
+        function renderTemplateDeleteConfirm(name) {
+            return `
+                <div class="template-delete-confirm visible" style="background: rgba(239,68,68,0.1); border-top: 1px solid rgba(239,68,68,0.3); padding: 8px 10px; font-size: 0.75rem; color: var(--text-primary);">
+                    <div style="margin-bottom: 6px;">Delete "${escapeHtml(name)}"?</div>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn btn-danger" onclick="confirmDeleteTemplate('${escapeHtml(name)}')" style="flex: 1; padding: 4px;">Delete</button>
+                        <button class="btn btn-cancel" onclick="cancelTemplateOperation()" style="flex: 1; padding: 4px;">Cancel</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function loadTemplateFromDropdown(templateName) {
+            loadNodeTemplate(templateName);
+            const section = document.getElementById('templateDropdownSection');
+            section.style.display = 'none';
+        }
+
+        function startRenameTemplate(e, name) {
+            e.stopPropagation();
+            editingTemplateName = name;
+            deleteConfirmTemplate = null;
+            renderTemplateList();
+            setTimeout(() => {
+                const input = document.getElementById('templateRenameInput');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 10);
+        }
+
+        function handleTemplateRenameKeydown(e, oldName) {
+            if (e.key === 'Enter') {
+                confirmRenameTemplate(oldName);
+            } else if (e.key === 'Escape') {
+                cancelTemplateOperation();
+            }
+        }
+
+        function confirmRenameTemplate(oldName) {
+            const input = document.getElementById('templateRenameInput');
+            const newName = input ? input.value.trim() : '';
+            if (!newName || newName === oldName) {
+                cancelTemplateOperation();
+                return;
+            }
+
+            if (templates[newName]) {
+                alert('Template with this name already exists');
+                return;
+            }
+
+            renameTemplate(oldName, newName);
+            cancelTemplateOperation();
+            renderTemplateList();
+        }
+
+        function startDeleteTemplate(e, name) {
+            e.stopPropagation();
+            deleteConfirmTemplate = name;
+            editingTemplateName = null;
+            renderTemplateList();
+        }
+
+        function confirmDeleteTemplate(name) {
+            deleteTemplate(name);
+            cancelTemplateOperation();
+            renderTemplateList();
+        }
+
+        function cancelTemplateOperation() {
+            editingTemplateName = null;
+            deleteConfirmTemplate = null;
+            renderTemplateList();
+        }
+
         function copyNodeTo(sourceId, targetId) {
             const sourceNode = treeData.nodes[sourceId];
             const targetNode = treeData.nodes[targetId];
@@ -1749,7 +2142,51 @@
                         });
                         delete branchCache[selectedNode];
                     }
-                    
+
+                    // Auto-populate branches if changing to non-end type and currently empty
+                    if (node.branches.length === 0 && newType !== 'end') {
+                        // Create end nodes for the branches
+                        const endNode1Id = generateId('node');
+                        const endNode2Id = generateId('node');
+
+                        treeData.nodes[endNode1Id] = {
+                            id: endNode1Id,
+                            name: "End",
+                            type: "end",
+                            branches: [],
+                            x: 0,
+                            y: 0
+                        };
+
+                        treeData.nodes[endNode2Id] = {
+                            id: endNode2Id,
+                            name: "End",
+                            type: "end",
+                            branches: [],
+                            x: 0,
+                            y: 0
+                        };
+
+                        node.branches = [
+                            {
+                                id: generateId('branch'),
+                                name: 'Branch 1',
+                                probability: newType === 'chance' ? 50 : undefined,
+                                logic: newType === 'logic' ? '' : undefined,
+                                value: 0,
+                                childId: endNode1Id
+                            },
+                            {
+                                id: generateId('branch'),
+                                name: 'Branch 2',
+                                probability: newType === 'chance' ? 50 : undefined,
+                                logic: newType === 'logic' ? '' : undefined,
+                                value: 0,
+                                childId: endNode2Id
+                            }
+                        ];
+                    }
+
                     // Update branch properties for new type
                     node.branches.forEach(branch => {
                         if (newType === 'chance' || newType === 'logic') {
@@ -2052,13 +2489,45 @@
 
         // ============ LAYOUT & RENDERING ============
 
+        // ============ LAYOUT HELPERS ============
+        function getNodeCenter(node) {
+            return {
+                x: node.x + MARKER_SIZE / 2,
+                y: node.y + MARKER_SIZE / 2
+            };
+        }
+
+        function getSiblingSpacing(orientation) {
+            return treeSettings[orientation].branchGap * MARKER_SIZE;
+        }
+
+        function getRootBranchEnd(orientation) {
+            const rootNode = treeData.nodes[treeData.rootId];
+            const center = getNodeCenter(rootNode);
+            if (orientation === 'vertical') {
+                return ROOT_X + treeSettings.vertical.nodeGap + treeSettings.vertical.branchLength;
+            } else {
+                return center.x;
+            }
+        }
+
         function layoutTree() {
             if (!treeData.rootId) return;
-            
+
+            if (treeData.orientation === 'vertical') {
+                layoutTreeVertical();
+            } else {
+                layoutTreeHorizontal();
+            }
+        }
+
+        function layoutTreeHorizontal() {
+            if (!treeData.rootId) return;
+
             function getSubtreeHeight(nodeId) {
                 const node = treeData.nodes[nodeId];
                 if (!node || node._hidden || node.branches.length === 0) return MARKER_SIZE;
-                
+
                 let totalHeight = 0;
                 node.branches.forEach((branch, i) => {
                     const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
@@ -2067,7 +2536,7 @@
                     } else {
                         totalHeight += MARKER_SIZE;
                     }
-                    if (i < node.branches.length - 1) totalHeight += SIBLING_GAP;
+                    if (i < node.branches.length - 1) totalHeight += getSiblingSpacing('horizontal');
                 });
                 return Math.max(totalHeight, MARKER_SIZE);
             }
@@ -2075,30 +2544,82 @@
             function positionNode(nodeId, x, y) {
                 const node = treeData.nodes[nodeId];
                 if (!node || node._hidden) return;
-                
+
                 node.x = x;
                 node.y = y;
-                
+
                 if (node.branches.length === 0) return;
-                
+
                 const subtreeHeight = getSubtreeHeight(nodeId);
                 let currentY = y - subtreeHeight / 2 + MARKER_SIZE / 2;
-                
+
                 node.branches.forEach((branch) => {
                     const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
                     if (childNode && !childNode._hidden) {
                         const childHeight = getSubtreeHeight(branch.childId);
-                        positionNode(branch.childId, x + BRANCH_LENGTH, currentY + childHeight / 2 - MARKER_SIZE / 2);
-                        currentY += childHeight + SIBLING_GAP;
+                        positionNode(branch.childId, x + treeSettings.horizontal.branchLength, currentY + childHeight / 2 - MARKER_SIZE / 2);
+                        currentY += childHeight + getSiblingSpacing('horizontal');
                     } else {
-                        currentY += MARKER_SIZE + SIBLING_GAP;
+                        currentY += MARKER_SIZE + getSiblingSpacing('horizontal');
                     }
                 });
             }
-            
+
             const treeHeight = getSubtreeHeight(treeData.rootId);
             const startY = Math.max(100, treeHeight / 2 + 50);
-            positionNode(treeData.rootId, ROOT_X + BRANCH_LENGTH, startY);
+            // Position root at the end of the branch line (same as normal branches)
+            // Branch structure: nodeGap (before branch) + branchLength (branch section)
+            positionNode(treeData.rootId, ROOT_X + treeSettings.horizontal.nodeGap + treeSettings.horizontal.branchLength, startY);
+        }
+
+        function layoutTreeVertical() {
+            if (!treeData.rootId) return;
+
+            function getSubtreeWidth(nodeId) {
+                const node = treeData.nodes[nodeId];
+                if (!node || node._hidden || node.branches.length === 0) return MARKER_SIZE;
+
+                let totalWidth = 0;
+                node.branches.forEach((branch, i) => {
+                    const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
+                    if (childNode && !childNode._hidden) {
+                        totalWidth += getSubtreeWidth(branch.childId);
+                    } else {
+                        totalWidth += MARKER_SIZE;
+                    }
+                    if (i < node.branches.length - 1) totalWidth += getSiblingSpacing('vertical');
+                });
+                return Math.max(totalWidth, MARKER_SIZE);
+            }
+
+            function positionNode(nodeId, x, y) {
+                const node = treeData.nodes[nodeId];
+                if (!node || node._hidden) return;
+
+                node.x = x;
+                node.y = y;
+
+                if (node.branches.length === 0) return;
+
+                const subtreeWidth = getSubtreeWidth(nodeId);
+                let currentX = x - subtreeWidth / 2 + MARKER_SIZE / 2;
+
+                node.branches.forEach((branch) => {
+                    const childNode = branch.childId ? treeData.nodes[branch.childId] : null;
+                    if (childNode && !childNode._hidden) {
+                        const childWidth = getSubtreeWidth(branch.childId);
+                        // Position child directly at branch end using configured vertical spacing
+                        positionNode(branch.childId, currentX + childWidth / 2 - MARKER_SIZE / 2, y + treeSettings.vertical.nodeGap + treeSettings.vertical.branchLength);
+                        currentX += childWidth + getSiblingSpacing('vertical');
+                    } else {
+                        currentX += MARKER_SIZE + getSiblingSpacing('vertical');
+                    }
+                });
+            }
+
+            const treeWidth = getSubtreeWidth(treeData.rootId);
+            const startX = Math.max(100, treeWidth / 2 + 50);
+            positionNode(treeData.rootId, startX, ROOT_X + treeSettings.vertical.nodeGap + treeSettings.vertical.branchLength);
         }
 
         function renderTree() {
@@ -2145,63 +2666,119 @@
             const svg = document.getElementById('connectionsSvg');
             const canvas = document.getElementById('treeCanvas');
             const rootNode = treeData.nodes[treeData.rootId];
-            
-            const startX = ROOT_X;
-            const startY = rootNode.y + MARKER_SIZE / 2;
-            const endX = rootNode.x;
 
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', startX);
-            line.setAttribute('y1', startY);
-            line.setAttribute('x2', endX);
-            line.setAttribute('y2', startY);
-            line.setAttribute('stroke', getLineColor(0.4));
-            line.setAttribute('stroke-width', '2');
-            svg.appendChild(line);
+            if (treeData.orientation === 'vertical') {
+                // Vertical root branch - same structure as normal branches
+                const rootCenter = getNodeCenter(rootNode);
+                const startY = ROOT_X + MARKER_SIZE / 2;  // Start from center height, same as normal branches
+                const centerX = rootCenter.x;
 
-            const nameLabel = document.createElement('div');
-            nameLabel.className = 'branch-name';
-            nameLabel.style.left = (startX + 10) + 'px';
-            nameLabel.style.top = (startY - 16) + 'px';
-            nameLabel.textContent = treeData.rootBranch.name;
-            nameLabel.onclick = (e) => { e.stopPropagation(); selectRootBranch(); };
-            canvas.appendChild(nameLabel);
+                // Branch structure: slanted connector + vertical branch + vertical line to node
+                const branchStartY = startY + treeSettings.vertical.nodeGap;
+                const branchLength = treeSettings.vertical.branchLength;
+                const branchEndY = branchStartY + branchLength;
 
-            if (treeData.rootBranch.value !== 0) {
-                const valLabel = document.createElement('div');
-                valLabel.className = 'branch-val';
-                valLabel.style.left = (endX - 10) + 'px';
-                valLabel.style.top = (startY + 4) + 'px';
-                valLabel.style.transform = 'translateX(-100%)';
-                valLabel.textContent = formatValueNoUnit(treeData.rootBranch.value);
-                canvas.appendChild(valLabel);
+                // Draw path: diagonal from start to branch start, then vertical to node
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M ${centerX} ${startY} L ${centerX} ${branchStartY} L ${centerX} ${branchEndY} L ${centerX} ${rootCenter.y}`);
+                path.setAttribute('stroke', getLineColor(0.4));
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('fill', 'none');
+                svg.appendChild(path);
+
+                const nameLabel = document.createElement('div');
+                nameLabel.className = 'branch-name';
+                nameLabel.style.left = (centerX + 4) + 'px';
+                nameLabel.style.top = (branchStartY + (branchEndY - branchStartY) / 2 + treeSettings.vertical.branchNameOffset) + 'px';
+                nameLabel.textContent = treeData.rootBranch.name;
+                nameLabel.onclick = (e) => { e.stopPropagation(); selectRootBranch(); };
+                canvas.appendChild(nameLabel);
+
+                if (treeData.rootBranch.value !== 0) {
+                    const valLabel = document.createElement('div');
+                    valLabel.className = 'branch-val';
+                    valLabel.style.left = (centerX + 4) + 'px';
+                    valLabel.style.top = (branchEndY - treeSettings.vertical.branchValOffset) + 'px';
+                    valLabel.textContent = formatValueNoUnit(treeData.rootBranch.value);
+                    canvas.appendChild(valLabel);
+                }
+            } else {
+                // Horizontal root branch - same structure as normal branches
+                const rootCenter = getNodeCenter(rootNode);
+                const startX = ROOT_X + MARKER_SIZE / 2;
+                const startY = rootCenter.y;
+                const endX = rootCenter.x;
+                const endY = rootCenter.y;
+
+                // Diagonal from node center, then horizontal
+                const horizStartX = startX + treeSettings.horizontal.nodeGap;
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M ${startX} ${startY} L ${horizStartX} ${endY} L ${endX} ${endY}`);
+                path.setAttribute('stroke', getLineColor(0.4));
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('fill', 'none');
+                svg.appendChild(path);
+
+                const nameLabel = document.createElement('div');
+                nameLabel.className = 'branch-name';
+                nameLabel.style.left = (horizStartX + 8) + 'px';
+                nameLabel.style.top = (endY - 16) + 'px';
+                nameLabel.textContent = treeData.rootBranch.name;
+                nameLabel.onclick = (e) => { e.stopPropagation(); selectRootBranch(); };
+                canvas.appendChild(nameLabel);
+
+                if (treeData.rootBranch.value !== 0) {
+                    const valLabel = document.createElement('div');
+                    valLabel.className = 'branch-val';
+                    valLabel.style.left = (endX - treeSettings.horizontal.branchValOffset) + 'px';
+                    valLabel.style.top = (endY + 4) + 'px';
+                    valLabel.style.transform = 'translateX(-100%)';
+                    valLabel.textContent = formatValueNoUnit(treeData.rootBranch.value);
+                    canvas.appendChild(valLabel);
+                }
             }
         }
 
         function renderBranch(parentNode, branch, branchIndex) {
+            if (treeData.orientation === 'vertical') {
+                renderBranchVertical(parentNode, branch, branchIndex);
+            } else {
+                renderBranchHorizontal(parentNode, branch, branchIndex);
+            }
+        }
+
+        function renderBranchHorizontal(parentNode, branch, branchIndex) {
             const svg = document.getElementById('connectionsSvg');
             const canvas = document.getElementById('treeCanvas');
-            
-            const startX = parentNode.x + MARKER_SIZE / 2;
-            const startY = parentNode.y + MARKER_SIZE / 2;
-            
+
+            const parentCenter = getNodeCenter(parentNode);
+            const startX = parentCenter.x;
+            const startY = parentCenter.y;
+
             let endX, endY;
             let hasChild = !!branch.childId;
-            
+
             if (hasChild) {
                 const childNode = treeData.nodes[branch.childId];
                 if (childNode._hidden) return;
-                endX = childNode.x;
-                endY = childNode.y + MARKER_SIZE / 2;
+                const childCenter = getNodeCenter(childNode);
+                endX = childCenter.x;
+                endY = childCenter.y;
             } else {
                 const numBranches = parentNode.branches.length;
-                const totalHeight = (numBranches - 1) * SIBLING_GAP;
-                endX = parentNode.x + BRANCH_LENGTH;
-                endY = parentNode.y + MARKER_SIZE / 2 - totalHeight / 2 + branchIndex * SIBLING_GAP;
+                const siblingSpacing = getSiblingSpacing('horizontal');
+                const totalHeight = (numBranches - 1) * siblingSpacing;
+                endX = parentNode.x + treeSettings.horizontal.branchLength + MARKER_SIZE / 2;
+                endY = parentCenter.y - totalHeight / 2 + branchIndex * siblingSpacing;
             }
 
-            const horizStartX = endX - HORIZONTAL_LENGTH;
-            
+            // Branch structure: diagonal from node center, then horizontal to child center
+            // nodeGap: horizontal distance before horizontal section starts (diagonal width)
+            // branchLength: total horizontal distance from parent center to child center
+            // Horizontal section length: branchLength - nodeGap
+            const horizStartX = startX + treeSettings.horizontal.nodeGap;
+
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', `M ${startX} ${startY} L ${horizStartX} ${endY} L ${endX} ${endY}`);
             path.setAttribute('stroke', hasChild ? getLineColor(0.3) : getDashedLineColor());
@@ -2221,28 +2798,118 @@
             if (hasChild) {
                 const showProb = (parentNode.type === 'chance' || parentNode.type === 'logic') && branch.probability !== undefined;
                 const showVal = branch.value !== 0;
-                
+
                 if (showProb) {
                     const probLabel = document.createElement('div');
                     probLabel.className = 'branch-prob';
-                    probLabel.style.left = (endX - 8) + 'px';
+                    probLabel.style.left = (endX - treeSettings.horizontal.branchValOffset) + 'px';
                     probLabel.style.top = (endY - 16) + 'px';
                     probLabel.style.transform = 'translateX(-100%)';
                     probLabel.textContent = (branch.probability || 0) + '%';
                     canvas.appendChild(probLabel);
                 }
-                
+
                 if (showVal) {
                     const valLabel = document.createElement('div');
                     valLabel.className = 'branch-val';
-                    valLabel.style.left = (endX - 8) + 'px';
+                    valLabel.style.left = (endX - treeSettings.horizontal.branchValOffset) + 'px';
                     valLabel.style.top = (endY + 4) + 'px';
                     valLabel.style.transform = 'translateX(-100%)';
                     valLabel.textContent = formatValueNoUnit(branch.value);
                     canvas.appendChild(valLabel);
                 }
             }
-            
+
+            if (!hasChild) {
+                const hint = document.createElement('div');
+                hint.className = 'add-node-hint';
+                hint.style.left = (endX - 10) + 'px';
+                hint.style.top = (endY - 10) + 'px';
+                hint.textContent = '+';
+                hint.onclick = (e) => { e.stopPropagation(); showAddNodeMenu(e, parentNode.id, branchIndex); };
+                canvas.appendChild(hint);
+            }
+        }
+
+        function renderBranchVertical(parentNode, branch, branchIndex) {
+            const svg = document.getElementById('connectionsSvg');
+            const canvas = document.getElementById('treeCanvas');
+
+            const parentCenter = getNodeCenter(parentNode);
+            const parentCenterX = parentCenter.x;
+            const parentCenterY = parentCenter.y;
+
+            let childX, childY;
+            let hasChild = !!branch.childId;
+
+            if (hasChild) {
+                const childNode = treeData.nodes[branch.childId];
+                if (childNode._hidden) return;
+                const childCenter = getNodeCenter(childNode);
+                childX = childCenter.x;
+                childY = childCenter.y;
+            } else {
+                const numBranches = parentNode.branches.length;
+                const siblingSpacing = getSiblingSpacing('vertical');
+                const totalWidth = (numBranches - 1) * siblingSpacing;
+                childX = parentCenter.x - totalWidth / 2 + branchIndex * siblingSpacing;
+                childY = parentNode.y + treeSettings.vertical.nodeGap + treeSettings.vertical.branchLength;
+            }
+
+            // Vertical branch section
+            // branchStartY: where slanted connector meets vertical branch (at childX)
+            // branchEndY: bottom of vertical branch (where values go)
+            const branchStartY = parentCenterY + treeSettings.vertical.nodeGap;
+            const branchLength = treeSettings.vertical.branchLength;
+            const branchEndY = branchStartY + branchLength;
+
+            // Draw path:
+            // 1. Slanted connector from parent center to branch start at childX
+            // 2. Vertical branch line (straight down at childX)
+            // 3. Vertical line to child (childX to childX)
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${parentCenterX} ${parentCenterY} L ${childX} ${branchStartY} L ${childX} ${branchEndY} L ${childX} ${childY}`);
+            path.setAttribute('stroke', hasChild ? getLineColor(0.3) : getDashedLineColor());
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('fill', 'none');
+            if (!hasChild) path.setAttribute('stroke-dasharray', '5,5');
+            svg.appendChild(path);
+
+            // Branch name: vertically centered to the right of the vertical branch section
+            const nameLabel = document.createElement('div');
+            nameLabel.className = 'branch-name';
+            nameLabel.style.left = (childX + 4) + 'px';
+            nameLabel.style.top = (branchStartY + (branchEndY - branchStartY) / 2 + treeSettings.vertical.branchNameOffset) + 'px';
+            nameLabel.textContent = branch.name;
+            nameLabel.onclick = (e) => { e.stopPropagation(); selectNode(parentNode.id); };
+            canvas.appendChild(nameLabel);
+
+            if (hasChild) {
+                const showProb = (parentNode.type === 'chance' || parentNode.type === 'logic') && branch.probability !== undefined;
+                const showVal = branch.value !== 0;
+
+                // Probability on left side at bottom of vertical branch
+                if (showProb) {
+                    const probLabel = document.createElement('div');
+                    probLabel.className = 'branch-prob';
+                    probLabel.style.left = (childX - 8) + 'px';
+                    probLabel.style.top = (branchEndY - treeSettings.vertical.branchValOffset) + 'px';
+                    probLabel.style.transform = 'translateX(-100%)';
+                    probLabel.textContent = (branch.probability || 0) + '%';
+                    canvas.appendChild(probLabel);
+                }
+
+                // Value on right side at bottom of vertical branch
+                if (showVal) {
+                    const valLabel = document.createElement('div');
+                    valLabel.className = 'branch-val';
+                    valLabel.style.left = (childX + 8) + 'px';
+                    valLabel.style.top = (branchEndY - treeSettings.vertical.branchValOffset) + 'px';
+                    valLabel.textContent = formatValueNoUnit(branch.value);
+                    canvas.appendChild(valLabel);
+                }
+            }
+
             if (!hasChild) {
                 const hint = document.createElement('div');
                 hint.className = 'add-node-hint';
@@ -2271,6 +2938,13 @@
             marker.className = markerClass;
             marker.style.left = node.x + 'px';
             marker.style.top = node.y + 'px';
+
+            // Apply end node rotation if applicable
+            if (node.type === 'end') {
+                const rotation = treeSettings[treeData.orientation].endnodeRotation;
+                marker.style.setProperty('--rotation', `${rotation}deg`);
+            }
+
             marker.innerHTML = shapes[node.type]();
             marker.onclick = (e) => {
                 e.stopPropagation();
@@ -2283,9 +2957,19 @@
             canvas.appendChild(marker);
 
             const infoDiv = document.createElement('div');
-            infoDiv.style.left = (node.x + MARKER_SIZE + 12) + 'px';
-            infoDiv.style.top = (node.y + 2) + 'px';
-            
+
+            // Position differently based on orientation
+            if (treeData.orientation === 'vertical') {
+                // Below node, centered horizontally
+                infoDiv.style.left = (node.x + MARKER_SIZE / 2) + 'px';
+                infoDiv.style.top = (node.y + MARKER_SIZE + 4) + 'px';
+                infoDiv.style.transform = 'translateX(-50%)';
+            } else {
+                // Right of node, in horizontal layout
+                infoDiv.style.left = (node.x + MARKER_SIZE + 12) + 'px';
+                infoDiv.style.top = (node.y + 2) + 'px';
+            }
+
             if (node.type === 'end') {
                 const stats = calculateEndNodeStats(node.id);
                 infoDiv.className = 'end-node-info';
@@ -2325,7 +3009,7 @@
                 <div class="legend-items">
                     ${Array.from(typesInTree).map(type => `
                         <div class="legend-item">
-                            <div class="legend-shape">${legendShapes[type]}</div>
+                            <div class="legend-shape" ${type === 'end' ? `style="transform: rotate(${treeSettings[treeData.orientation].endnodeRotation}deg)"` : ''}>${legendShapes[type]}</div>
                             ${typeLabels[type]}
                         </div>
                     `).join('')}
@@ -2345,7 +3029,7 @@
         function fitToView() {
             const viewport = document.getElementById('treeViewport');
             let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
-            
+
             for (const id in treeData.nodes) {
                 const node = treeData.nodes[id];
                 if (node._hidden) continue;
@@ -2355,16 +3039,24 @@
                 maxY = Math.max(maxY, node.y + 60);
             }
             minX = Math.min(minX, ROOT_X);
-            
+
             const treeWidth = maxX - minX + 100;
             const treeHeight = maxY - minY + 100;
             const viewWidth = viewport.clientWidth - 40;
             const viewHeight = viewport.clientHeight - 120;
-            
+
             currentZoom = Math.min(Math.max(Math.min(viewWidth / treeWidth, viewHeight / treeHeight), 0.4), 1.5);
             currentPan.x = (viewWidth - treeWidth * currentZoom) / 2 - (minX - 50) * currentZoom + 20;
             currentPan.y = (viewHeight - treeHeight * currentZoom) / 2 - (minY - 50) * currentZoom + 60;
             updateTransform();
+        }
+
+        function toggleOrientation() {
+            treeData.orientation = treeData.orientation === 'horizontal' ? 'vertical' : 'horizontal';
+            saveCurrentProject();
+            layoutTree();
+            renderTree();
+            requestAnimationFrame(() => setTimeout(fitToView, 100));
         }
 
         // ============ SELECTION & EDIT PANELS ============
@@ -2503,7 +3195,13 @@
                     </div>
                     <div class="form-group">
                         <label>Name</label>
-                        <input type="text" id="nodeNameInput" value="${escapeHtml(node.name)}" onchange="updateNodeFromForm()">
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <input type="text" id="nodeNameInput" value="${escapeHtml(node.name)}" onchange="updateNodeFromForm()" style="flex: 1;">
+                            <button class="btn btn-copy" onclick="showTemplateDropdown()" style="padding: 6px 10px; font-size: 0.75rem;">Load</button>
+                        </div>
+                    </div>
+                    <div id="templateDropdownSection" style="display: none; margin-bottom: 10px; max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card);">
+                        <!-- Templates will be rendered here -->
                     </div>
                     <div class="form-group">
                         <label>Type</label>
@@ -2532,8 +3230,19 @@
             const footer = document.getElementById('nodeCardFooter');
             if (copyMode) {
                 footer.innerHTML = `
-                    <button class="btn btn-cancel" onclick="closeEditPanel()">Cancel</button>
-                    <button class="btn btn-confirm" onclick="executeCopyMode()" ${!copyTargetNode ? 'disabled' : ''}>Copy</button>
+                    <div id="templateNameInputSection" style="display: none; flex-direction: column; gap: 6px; padding: 10px; background: rgba(79, 70, 229, 0.1); border-radius: 6px; margin-bottom: 10px;">
+                        <label style="font-size: 0.75rem; color: var(--text-secondary);">Template Name</label>
+                        <input type="text" id="templateNameInput" placeholder="Enter template name" onkeydown="handleTemplateNameKeydown(event)" style="padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;">
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-cancel" onclick="cancelStoreTemplate()" style="flex: 1; padding: 4px; font-size: 0.75rem;">✕</button>
+                            <button class="btn btn-confirm" onclick="confirmStoreTemplate()" style="flex: 1; padding: 4px; font-size: 0.75rem;">✓</button>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn btn-copy" onclick="startStoringTemplate()" style="flex: 1; padding: 6px;">Store</button>
+                        <button class="btn btn-cancel" onclick="closeEditPanel()" style="flex: 1; padding: 6px;">Cancel</button>
+                        <button class="btn btn-confirm" onclick="executeCopyMode()" ${!copyTargetNode ? 'disabled' : ''} style="flex: 1; padding: 6px;">Copy</button>
+                    </div>
                 `;
             } else {
                 footer.innerHTML = `
@@ -2574,7 +3283,7 @@
                     colIdx++;
                 }
                 cells += `<td><input type="text" class="number-input" data-row="${i}" data-col="${colIdx}" value="${b.value || 0}" onchange="updateBranchField('${nodeId}', ${i}, 'value', this.value)"></td>`;
-                cells += `<td><button class="delete-btn" onclick="deleteBranch('${nodeId}', ${i})">×</button></td>`;
+                cells += `<td><button class="delete-btn" onclick="deleteBranch('${nodeId}', ${i})">🗑️</button></td>`;
                 return `<tr>${cells}</tr>`;
             }).join('');
 
@@ -2632,8 +3341,7 @@
             
             document.getElementById('nodeCardHeader').textContent = 'Root Branch Settings';
             branchCard.style.display = 'none';
-            hideCopyCard();
-            
+
             nodeBody.innerHTML = `
                 <div class="form-group">
                     <label>Name (Project Title)</label>
@@ -2893,6 +3601,7 @@
             // Regenerate shapes after dark mode is initialized so strokes are correct
             shapes = getShapes();
             loadProjects();
+            loadTemplates();
 
             const projectNames = Object.keys(projects);
             if (projectNames.length > 0) {
